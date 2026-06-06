@@ -1,6 +1,19 @@
-const API_URL =
-  import.meta.env.VITE_API_URL ||
-  `${window.location.protocol}//${window.location.hostname}:5055/api`;
+const getApiUrl = () => {
+  const envUrl = import.meta.env.VITE_API_URL;
+  const isLocalhost = window.location.hostname === "localhost" || window.location.hostname === "127.0.0.1";
+  
+  if (isLocalhost) {
+    return envUrl || `http://localhost:5055/api`;
+  }
+  
+  if (envUrl && !envUrl.includes("localhost") && !envUrl.includes("127.0.0.1")) {
+    return envUrl;
+  }
+  
+  return `${window.location.origin}/api`;
+};
+
+const API_URL = getApiUrl();
 
 export const assetUrl = (url) => {
   if (!url) return "";

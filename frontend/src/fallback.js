@@ -12,7 +12,18 @@ export const images = {
   learning: img("photo-1509062522246-3755977927d7")
 };
 
-export const heroBanners = [];
+export const heroBanners = [
+  {
+    _id: "default-hero",
+    title: "Empowering Students for Spiritual & Personal Excellence",
+    subtitle: "Welcome to ISKCON Juhu IPP",
+    buttonText: "Explore Courses",
+    buttonLink: "/courses",
+    desktopImage: images.hero,
+    isActive: true,
+    order: 1
+  }
+];
 
 export const homeSections = [
   { sectionKey: "upcoming_classes", sectionTitle: "Upcoming Classes On Sunday", sectionSubtitle: "Timing 6 PM to 9 PM" },

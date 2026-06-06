@@ -34,10 +34,25 @@ export const AuthProvider = ({ children }) => {
       return;
     }
 
-    const backendUrl = import.meta.env.VITE_API_URL || `${window.location.protocol}//${window.location.hostname}:5055`;
-    const socketInstance = io(backendUrl.replace(/\/api$/, ""), {
+    const getSocketUrl = () => {
+      const envUrl = import.meta.env.VITE_API_URL;
+      const isLocalhost = window.location.hostname === "localhost" || window.location.hostname === "127.0.0.1";
+      
+      if (isLocalhost) {
+        const base = envUrl || `http://localhost:5055`;
+        return base.replace(/\/api$/, "");
+      }
+      
+      if (envUrl && !envUrl.includes("localhost") && !envUrl.includes("127.0.0.1")) {
+        return envUrl.replace(/\/api$/, "");
+      }
+      
+      return window.location.origin;
+    };
+
+    const socketInstance = io(getSocketUrl(), {
       auth: { token },
-      transports: ["websocket"]
+      transports: ["websocket", "polling"]
     });
 
     socketInstance.emit("user_connected", { userId: user._id });

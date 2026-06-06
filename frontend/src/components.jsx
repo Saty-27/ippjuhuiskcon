@@ -548,7 +548,21 @@ export const HeroSlider = ({ banners = [] }) => {
     if (current >= activeBanners.length) setCurrent(0);
   }, [activeBanners.length, current]);
 
-  if (!activeBanners.length) return null;
+  if (!activeBanners.length) {
+    return (
+      <section className="relative overflow-hidden bg-slate-950 text-white w-full h-[380px] sm:h-[480px] md:h-[580px] lg:h-[680px] flex items-center">
+        <div className="absolute inset-0 bg-gradient-to-r from-black/85 via-black/50 to-transparent z-10" />
+        <div className="container-pad relative z-20 w-full animate-pulse">
+          <div className="max-w-3xl">
+            <div className="h-4 w-48 bg-primary/30 rounded mb-4" />
+            <div className="h-12 w-full max-w-2xl bg-white/10 rounded mb-3" />
+            <div className="h-12 w-3/4 bg-white/10 rounded mb-8" />
+            <div className="h-12 w-40 bg-primary/20 rounded-full" />
+          </div>
+        </div>
+      </section>
+    );
+  }
 
   const move = (direction) => setCurrent((index) => (index + direction + activeBanners.length) % activeBanners.length);
 
@@ -558,18 +572,18 @@ export const HeroSlider = ({ banners = [] }) => {
         {activeBanners.map((banner, index) => {
           const hasCopy = banner.title || banner.subtitle || (banner.buttonText && banner.buttonLink);
           return (
-            <div key={banner._id || `${banner.desktopImage}-${index}`} className={`transition-opacity duration-700 ease-out ${index === current ? "opacity-100 relative" : "pointer-events-none opacity-0 absolute inset-0"}`} aria-hidden={index !== current}>
-              <picture>
+            <div key={banner._id || `${banner.desktopImage}-${index}`} className={`relative w-full h-[380px] sm:h-[480px] md:h-[580px] lg:h-[680px] overflow-hidden bg-slate-950 text-white transition-opacity duration-700 ease-out ${index === current ? "opacity-100 block" : "pointer-events-none opacity-0 absolute inset-0"}`} aria-hidden={index !== current}>
+              <picture className="absolute inset-0 w-full h-full">
                 {banner.mobileImage && <source media="(max-width: 639px)" srcSet={assetUrl(banner.mobileImage)} />}
                 {banner.tabletImage && <source media="(max-width: 1023px)" srcSet={assetUrl(banner.tabletImage)} />}
-                <img src={assetUrl(banner.desktopImage)} alt={banner.title || "Hero banner"} loading={index === 0 ? "eager" : "lazy"} className="w-full h-auto block" />
+                <img src={assetUrl(banner.desktopImage)} alt={banner.title || "Hero banner"} loading={index === 0 ? "eager" : "lazy"} className="w-full h-full object-cover" />
               </picture>
-              {hasCopy && <div className="absolute inset-0 bg-gradient-to-r from-black/80 via-black/45 to-black/10" />}
+              {hasCopy && <div className="absolute inset-0 bg-gradient-to-r from-black/85 via-black/50 to-transparent z-10" />}
               {hasCopy && (
-                <div className="container-pad absolute inset-x-0 top-1/2 -translate-y-1/2">
+                <div className="container-pad absolute inset-x-0 top-1/2 -translate-y-1/2 z-20">
                   <div className="max-w-3xl">
                     {banner.subtitle && <p className="mb-4 text-sm font-black uppercase tracking-[0.2em] text-primary">{banner.subtitle}</p>}
-                    {banner.title && <h1 className="text-4xl font-black leading-tight sm:text-5xl lg:text-7xl">{banner.title}</h1>}
+                    {banner.title && <h1 className="text-4xl font-black leading-tight sm:text-5xl lg:text-7xl text-white">{banner.title}</h1>}
                     {banner.buttonText && banner.buttonLink && <Link to={banner.buttonLink} className="mt-8 inline-flex rounded-full bg-primary px-7 py-3 text-sm font-black text-white shadow-xl shadow-primary/30 sm:px-8 sm:py-4 sm:text-base">{banner.buttonText}</Link>}
                   </div>
                 </div>

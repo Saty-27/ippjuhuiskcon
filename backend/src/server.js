@@ -353,7 +353,14 @@ const allowedOrigins = (process.env.CLIENT_URL || "http://localhost:5173,http://
 app.use(helmet({ crossOriginResourcePolicy: { policy: "cross-origin" } }));
 app.use(
   cors({
-    origin: (origin, cb) => (!origin || allowedOrigins.includes(origin) ? cb(null, true) : cb(new Error("Not allowed by CORS"))),
+    origin: (origin, cb) => {
+      if (!origin) return cb(null, true);
+      const isLocal = origin.includes("localhost") || origin.includes("127.0.0.1");
+      if (!isLocal || allowedOrigins.includes(origin)) {
+        return cb(null, true);
+      }
+      cb(new Error("Not allowed by CORS"));
+    },
     credentials: true
   })
 );
