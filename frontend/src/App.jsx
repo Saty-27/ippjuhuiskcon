@@ -1,4 +1,4 @@
-import { Navigate, Routes, Route } from "react-router-dom";
+import { Navigate, Routes, Route, useLocation } from "react-router-dom";
 import {
   AboutPage,
   AdminBannersPage,
@@ -102,6 +102,14 @@ const NotFoundPage = () => (
   </section>
 );
 
+const ScrollToTop = () => {
+  const { pathname } = useLocation();
+  useEffect(() => {
+    window.scrollTo(0, 0);
+  }, [pathname]);
+  return null;
+};
+
 const App = () => {
   useEffect(() => {
     apiFetch("/site-settings")
@@ -140,7 +148,9 @@ const App = () => {
   }, []);
 
   return (
-    <Routes>
+    <>
+      <ScrollToTop />
+      <Routes>
       <Route element={<PublicLayout />}>
         <Route path="/" element={<HomePage />} />
         <Route path="/about" element={<AboutPage />} />
@@ -213,6 +223,7 @@ const App = () => {
 
       <Route path="*" element={<NotFoundPage />} />
     </Routes>
+    </>
   );
 };
 

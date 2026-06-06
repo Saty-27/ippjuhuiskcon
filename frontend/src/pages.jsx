@@ -2125,7 +2125,9 @@ const ProfilePasswordPanel = () => {
   const { user, changePassword, updateProfile } = useAuth();
   const [profile, setProfile] = useState({ name: user?.name || "", email: user?.email || "", mobile: user?.mobile || user?.phone || "" });
   const [passwords, setPasswords] = useState({ currentPassword: "", newPassword: "", confirmPassword: "" });
+  const [showPassMap, setShowPassMap] = useState({ currentPassword: false, newPassword: false, confirmPassword: false });
   const [notice, setNotice] = useState("");
+
   const saveProfile = async (event) => {
     event.preventDefault();
     try {
@@ -2135,6 +2137,7 @@ const ProfilePasswordPanel = () => {
       setNotice(error.message);
     }
   };
+
   const savePassword = async (event) => {
     event.preventDefault();
     try {
@@ -2145,7 +2148,49 @@ const ProfilePasswordPanel = () => {
       setNotice(error.message);
     }
   };
-  return <div className="mt-8 grid gap-6 lg:grid-cols-2"><form onSubmit={saveProfile} className="rounded-2xl bg-white p-6 shadow-sm"><h2 className="text-2xl font-black">Profile</h2><div className="mt-5 grid gap-4"><input value={profile.name} onChange={(e) => setProfile({ ...profile, name: e.target.value })} className="rounded-xl border border-black/10 px-4 py-3" placeholder="Full name" /><input type="email" value={profile.email} onChange={(e) => setProfile({ ...profile, email: e.target.value })} className="rounded-xl border border-black/10 px-4 py-3" placeholder="Email address" /><input value={profile.mobile} onChange={(e) => setProfile({ ...profile, mobile: e.target.value })} className="rounded-xl border border-black/10 px-4 py-3" placeholder="Mobile number" /><button className="rounded-full bg-primary px-6 py-3 text-sm font-black text-white">Save Profile</button></div></form><form onSubmit={savePassword} className="rounded-2xl bg-white p-6 shadow-sm"><h2 className="text-2xl font-black">Change Password</h2><div className="mt-5 grid gap-4">{["currentPassword", "newPassword", "confirmPassword"].map((field) => <input key={field} value={passwords[field]} onChange={(e) => setPasswords({ ...passwords, [field]: e.target.value })} type="password" required className="rounded-xl border border-black/10 px-4 py-3" placeholder={fieldLabel(field)} />)}<button className="rounded-full bg-ink px-6 py-3 text-sm font-black text-white">Update Password</button></div></form>{notice && <p className="lg:col-span-2 rounded-xl bg-primary/10 p-3 text-sm font-bold text-primary">{notice}</p>}</div>;
+
+  return (
+    <div className="mt-8 grid gap-6 lg:grid-cols-2">
+      <form onSubmit={saveProfile} className="rounded-2xl bg-white p-6 shadow-sm">
+        <h2 className="text-2xl font-black">Profile</h2>
+        <div className="mt-5 grid gap-4">
+          <input value={profile.name} onChange={(e) => setProfile({ ...profile, name: e.target.value })} className="rounded-xl border border-black/10 px-4 py-3" placeholder="Full name" />
+          <input type="email" value={profile.email} onChange={(e) => setProfile({ ...profile, email: e.target.value })} className="rounded-xl border border-black/10 px-4 py-3" placeholder="Email address" />
+          <input value={profile.mobile} onChange={(e) => setProfile({ ...profile, mobile: e.target.value })} className="rounded-xl border border-black/10 px-4 py-3" placeholder="Mobile number" />
+          <button className="rounded-full bg-primary px-6 py-3 text-sm font-black text-white">Save Profile</button>
+        </div>
+      </form>
+      
+      <form onSubmit={savePassword} className="rounded-2xl bg-white p-6 shadow-sm">
+        <h2 className="text-2xl font-black">Change Password</h2>
+        <div className="mt-5 grid gap-4">
+          {["currentPassword", "newPassword", "confirmPassword"].map((field) => (
+            <div key={field} className="relative flex items-center">
+              <input
+                value={passwords[field]}
+                onChange={(e) => setPasswords({ ...passwords, [field]: e.target.value })}
+                type={showPassMap[field] ? "text" : "password"}
+                required
+                className="w-full rounded-xl border border-black/10 pl-4 pr-12 py-3 outline-none"
+                placeholder={fieldLabel(field)}
+              />
+              <button
+                type="button"
+                onClick={() => setShowPassMap((prev) => ({ ...prev, [field]: !prev[field] }))}
+                className="absolute right-4 text-muted hover:text-primary transition"
+                aria-label={showPassMap[field] ? "Hide password" : "Show password"}
+              >
+                {showPassMap[field] ? <EyeOff size={20} /> : <Eye size={20} />}
+              </button>
+            </div>
+          ))}
+          <button className="rounded-full bg-ink px-6 py-3 text-sm font-black text-white">Update Password</button>
+        </div>
+      </form>
+      
+      {notice && <p className="lg:col-span-2 rounded-xl bg-primary/10 p-3 text-sm font-bold text-primary">{notice}</p>}
+    </div>
+  );
 };
 
 const CourseProgressCard = ({ item }) => {
