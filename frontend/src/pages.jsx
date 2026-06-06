@@ -8,6 +8,7 @@ import {
   Clock,
   Edit,
   Eye,
+  EyeOff,
   FileText,
   GraduationCap,
   Home,
@@ -1719,6 +1720,9 @@ export const AuthPage = ({ register = false, admin = false, teacher = false }) =
   const navigate = useNavigate();
   const [form, setForm] = useState({ name: "", email: admin ? "admin@iskconlms.com" : teacher ? "teacher@iskconlms.com" : "", phone: "", role: "student", password: admin ? "Admin@123" : teacher ? "Teacher@123" : "", confirmPassword: "" });
   const [error, setError] = useState("");
+  const [showPassword, setShowPassword] = useState(false);
+  const [showConfirmPassword, setShowConfirmPassword] = useState(false);
+
   const submit = async (event) => {
     event.preventDefault();
     try {
@@ -1738,7 +1742,82 @@ export const AuthPage = ({ register = false, admin = false, teacher = false }) =
       setError(err.message);
     }
   };
-  return <><SEO title={register ? "Register" : admin ? "Admin Login" : teacher ? "Teacher Login" : "Login"} /><section className="grid min-h-screen place-items-center bg-soft px-4 py-12"><form onSubmit={submit} className="w-full max-w-md rounded-2xl bg-white p-8 shadow-premium"><div className="mb-8"><BrandLogo /></div><p className="mb-2 text-sm font-black uppercase tracking-wide text-primary">{admin ? "Admin Panel" : teacher ? "Teacher Panel" : "Student LMS"}</p><h1 className="text-3xl font-black">{register ? "Create Student Account" : admin ? "Admin Login" : teacher ? "Teacher Login" : "Login"}</h1>{admin && <p className="mt-3 rounded-xl bg-soft border border-black/10 p-3 text-sm font-bold text-ink">Use admin email and password to open the admin panel.</p>}<div className="mt-6 grid gap-4">{register && <><input value={form.name} onChange={(e) => setForm({ ...form, name: e.target.value })} required placeholder="Full name" className="rounded-xl border border-black/10 px-4 py-3 outline-none focus:border-primary" /><input value={form.phone} onChange={(e) => setForm({ ...form, phone: e.target.value })} required placeholder="Mobile number" className="rounded-xl border border-black/10 px-4 py-3 outline-none focus:border-primary" /><select value={form.role} onChange={(e) => setForm({ ...form, role: e.target.value })} className="rounded-xl border border-black/10 px-4 py-3 outline-none focus:border-primary"><option value="student">Student</option><option value="devotee">Devotee</option><option value="user">User</option></select></>}<input value={form.email} onChange={(e) => setForm({ ...form, email: e.target.value })} required type="email" autoComplete="email" placeholder="Email" className="rounded-xl border border-black/10 px-4 py-3 outline-none focus:border-primary" /><input value={form.password} onChange={(e) => setForm({ ...form, password: e.target.value })} required type="password" autoComplete="current-password" placeholder="Password" className="rounded-xl border border-black/10 px-4 py-3 outline-none focus:border-primary" />{register && <input value={form.confirmPassword} onChange={(e) => setForm({ ...form, confirmPassword: e.target.value })} required type="password" placeholder="Confirm password" className="rounded-xl border border-black/10 px-4 py-3 outline-none focus:border-primary" />}</div><button className="mt-6 w-full rounded-full bg-primary px-6 py-3 text-sm font-black text-white">{register ? "Register" : admin ? "Open Admin Panel" : teacher ? "Open Teacher Panel" : "Login"}</button>{error && <p className="mt-4 text-sm font-bold text-primary">{error}</p>}<div className="mt-5 flex flex-wrap justify-between gap-3 text-sm"><Link className="font-black text-primary" to="/">Back to Website</Link>{!admin && !teacher && <Link className="font-black text-primary" to={register ? "/login" : "/register"}>{register ? "Login" : "Register"}</Link>}{!register && !admin && !teacher && <Link className="font-black text-primary" to="/forgot-password">Forgot password</Link>}{!register && !admin && !teacher && <Link className="font-black text-primary" to="/request-password-reset">Request admin reset</Link>}</div></form></section></>;
+
+  return (
+    <>
+      <SEO title={register ? "Register" : admin ? "Admin Login" : teacher ? "Teacher Login" : "Login"} />
+      <section className="grid min-h-screen place-items-center bg-soft px-4 py-12">
+        <form onSubmit={submit} className="w-full max-w-md rounded-2xl bg-white p-8 shadow-premium">
+          <div className="mb-8">
+            <BrandLogo />
+          </div>
+          <p className="mb-2 text-sm font-black uppercase tracking-wide text-primary">
+            {admin ? "Admin Panel" : teacher ? "Teacher Panel" : "Student LMS"}
+          </p>
+          <h1 className="text-3xl font-black">
+            {register ? "Create Student Account" : admin ? "Admin Login" : teacher ? "Teacher Login" : "Login"}
+          </h1>
+          {admin && (
+            <p className="mt-3 rounded-xl bg-soft border border-black/10 p-3 text-sm font-bold text-ink">
+              Use admin email and password to open the admin panel.
+            </p>
+          )}
+          <div className="mt-6 grid gap-4">
+            {register && (
+              <>
+                <input value={form.name} onChange={(e) => setForm({ ...form, name: e.target.value })} required placeholder="Full name" className="rounded-xl border border-black/10 px-4 py-3 outline-none focus:border-primary" />
+                <input value={form.phone} onChange={(e) => setForm({ ...form, phone: e.target.value })} required placeholder="Mobile number" className="rounded-xl border border-black/10 px-4 py-3 outline-none focus:border-primary" />
+                <select value={form.role} onChange={(e) => setForm({ ...form, role: e.target.value })} className="rounded-xl border border-black/10 px-4 py-3 outline-none focus:border-primary">
+                  <option value="student">Student</option>
+                  <option value="devotee">Devotee</option>
+                  <option value="user">User</option>
+                </select>
+              </>
+            )}
+            <input value={form.email} onChange={(e) => setForm({ ...form, email: e.target.value })} required type="email" autoComplete="email" placeholder="Email" className="rounded-xl border border-black/10 px-4 py-3 outline-none focus:border-primary" />
+            
+            <div className="relative flex items-center">
+              <input value={form.password} onChange={(e) => setForm({ ...form, password: e.target.value })} required type={showPassword ? "text" : "password"} autoComplete="current-password" placeholder="Password" className="w-full rounded-xl border border-black/10 pl-4 pr-12 py-3 outline-none focus:border-primary" />
+              <button type="button" onClick={() => setShowPassword(!showPassword)} className="absolute right-4 text-muted hover:text-primary transition" aria-label={showPassword ? "Hide password" : "Show password"}>
+                {showPassword ? <EyeOff size={20} /> : <Eye size={20} />}
+              </button>
+            </div>
+
+            {register && (
+              <div className="relative flex items-center">
+                <input value={form.confirmPassword} onChange={(e) => setForm({ ...form, confirmPassword: e.target.value })} required type={showConfirmPassword ? "text" : "password"} placeholder="Confirm password" className="w-full rounded-xl border border-black/10 pl-4 pr-12 py-3 outline-none focus:border-primary" />
+                <button type="button" onClick={() => setShowConfirmPassword(!showConfirmPassword)} className="absolute right-4 text-muted hover:text-primary transition" aria-label={showConfirmPassword ? "Hide confirm password" : "Show confirm password"}>
+                  {showConfirmPassword ? <EyeOff size={20} /> : <Eye size={20} />}
+                </button>
+              </div>
+            )}
+          </div>
+          <button className="mt-6 w-full rounded-full bg-primary px-6 py-3 text-sm font-black text-white">
+            {register ? "Register" : admin ? "Open Admin Panel" : teacher ? "Open Teacher Panel" : "Login"}
+          </button>
+          {error && <p className="mt-4 text-sm font-bold text-primary">{error}</p>}
+          <div className="mt-5 flex flex-wrap justify-between gap-3 text-sm">
+            <Link className="font-black text-primary" to="/">Back to Website</Link>
+            {!admin && !teacher && (
+              <Link className="font-black text-primary" to={register ? "/login" : "/register"}>
+                {register ? "Login" : "Register"}
+              </Link>
+            )}
+            {!register && !admin && !teacher && (
+              <Link className="font-black text-primary" to="/forgot-password">
+                Forgot password
+              </Link>
+            )}
+            {!register && !admin && !teacher && (
+              <Link className="font-black text-primary" to="/request-password-reset">
+                Request admin reset
+              </Link>
+            )}
+          </div>
+        </form>
+      </section>
+    </>
+  );
 };
 
 export const VerifyOtpPage = () => {
