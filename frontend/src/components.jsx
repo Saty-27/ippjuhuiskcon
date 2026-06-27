@@ -846,7 +846,7 @@ export const VideoPlayer = ({ url, youtubeUrl, uploadedVideo, videoType, title, 
             const percent = duration ? Math.round((currentTime / duration) * 100) : 0;
 
             if (state === 2 || state === 0) {
-              onProgress?.({ currentTime, duration, percent });
+              onProgress?.({ currentTime, duration, percent, force: true });
             }
           }
         }
@@ -908,6 +908,14 @@ export const VideoPlayer = ({ url, youtubeUrl, uploadedVideo, videoType, title, 
         onTimeUpdate={(event) => {
           const video = event.currentTarget;
           onProgress?.({ currentTime: video.currentTime || 0, duration: video.duration || 0, percent: video.duration ? Math.round((video.currentTime / video.duration) * 100) : 0 });
+        }}
+        onPause={(event) => {
+          const video = event.currentTarget;
+          onProgress?.({ currentTime: video.currentTime || 0, duration: video.duration || 0, percent: video.duration ? Math.round((video.currentTime / video.duration) * 100) : 0, force: true });
+        }}
+        onSeeked={(event) => {
+          const video = event.currentTarget;
+          onProgress?.({ currentTime: video.currentTime || 0, duration: video.duration || 0, percent: video.duration ? Math.round((video.currentTime / video.duration) * 100) : 0, force: true });
         }}
       />
     );

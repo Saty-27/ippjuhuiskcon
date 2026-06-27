@@ -13,7 +13,7 @@ const getApiUrl = () => {
   return `${window.location.origin}/api`;
 };
 
-const API_URL = getApiUrl();
+export const API_URL = getApiUrl();
 
 export const assetUrl = (url) => {
   if (!url) return "";

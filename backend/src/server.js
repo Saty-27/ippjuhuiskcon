@@ -1381,7 +1381,9 @@ app.post(
 
     progress.watchedIntervals = mergeIntervals(intervalsToMerge);
     const watchSeconds = getWatchedSeconds(progress.watchedIntervals);
-    const watchPercent = duration ? Math.min(Math.round((watchSeconds / duration) * 100), 100) : 0;
+    const positionPercent = duration ? Math.min(Math.round((lastPosition / duration) * 100), 100) : 0;
+    const intervalPercent = duration ? Math.min(Math.round((watchSeconds / duration) * 100), 100) : 0;
+    const watchPercent = Math.max(intervalPercent, positionPercent);
 
     const threshold = Number(lesson.completionThreshold || 90);
     const isCompleted = progress.isCompleted || watchPercent >= threshold;

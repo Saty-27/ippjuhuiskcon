@@ -58,7 +58,7 @@ import {
   VideoPlayer,
   StudentSupportChat
 } from "./components";
-import { apiFetch, assetUrl, uploadFile } from "./api";
+import { apiFetch, assetUrl, uploadFile, API_URL } from "./api";
 import { useAuth } from "./AuthContext";
 import ReactQuill from "react-quill";
 import "react-quill/dist/quill.snow.css";
@@ -1092,18 +1092,24 @@ export const LearnPage = () => {
     if (canTrack) {
       apiFetch(`/progress/${course._id}/${lesson._id}`).then((data) => {
         setLessonProgress(data.progress);
-        if (data.progress && data.progress.lastPosition > 0) {
-          setResumeTime(data.progress.lastPosition);
-          setShowResumeBanner(true);
+        if (data.progress) {
+          if (data.progress.lastPosition > 0) {
+            setResumeTime(data.progress.lastPosition);
+            setShowResumeBanner(true);
+          } else {
+            setShowResumeBanner(false);
+          }
+          watchedIntervalsRef.current = data.progress.watchedIntervals || [];
         } else {
           setShowResumeBanner(false);
+          watchedIntervalsRef.current = [];
         }
       }).catch(() => {
         setLessonProgress(null);
         setShowResumeBanner(false);
+        watchedIntervalsRef.current = [];
       });
       
-      watchedIntervalsRef.current = [];
       lastTrackedTimeRef.current = null;
       
       apiFetch(`/lessons/${lesson._id}/notes?sort=${noteSort}&q=${encodeURIComponent(noteSearch)}`).then((data) => setNotes(data.items || [])).catch(() => setNotes([]));
@@ -1138,20 +1144,23 @@ export const LearnPage = () => {
 
   const completedIds = new Set(progress.records?.filter((item) => item.isCompleted).map((item) => item.lesson?._id || item.lesson));
   
-  const saveVideoProgress = ({ currentTime, duration, percent }) => {
+  const saveVideoProgress = ({ currentTime, duration, percent, force }) => {
     if (!canTrack || !duration) return;
 
+    let forceSave = force || false;
     if (lastTrackedTimeRef.current !== null) {
       const diff = currentTime - lastTrackedTimeRef.current;
       if (diff > 0 && diff < 4) {
         watchedIntervalsRef.current.push({ start: lastTrackedTimeRef.current, end: currentTime });
         watchedIntervalsRef.current = mergeLocalIntervals(watchedIntervalsRef.current);
+      } else if (Math.abs(diff) >= 4) {
+        forceSave = true;
       }
     }
     lastTrackedTimeRef.current = currentTime;
 
     const now = Date.now();
-    if (now - saveTimer.current < 10000) return;
+    if (!forceSave && now - saveTimer.current < 10000) return;
     saveTimer.current = now;
 
     const intervalsToSend = [...watchedIntervalsRef.current];
@@ -1189,7 +1198,7 @@ export const LearnPage = () => {
       });
       
       const blob = new Blob([payload], { type: 'application/json' });
-      navigator.sendBeacon("/api/progress", blob);
+      navigator.sendBeacon(`${API_URL}/progress`, blob);
     };
 
     window.addEventListener("beforeunload", handleVisibilityOrUnload);
@@ -1255,10 +1264,7 @@ export const LearnPage = () => {
   const repliesFor = (id) => comments.filter((item) => String(item.parentComment) === String(id));
 
   const currentIndex = course?.lessons?.findIndex((item) => item._id === lesson?._id) ?? -1;
-  const isCurrentLessonLocked = currentIndex > 0 && !["main_admin", "teacher"].includes(user?.role) && (() => {
-    const prev = course?.lessons?.[currentIndex - 1];
-    return prev ? !completedIds.has(prev._id) : false;
-  })();
+  const isCurrentLessonLocked = false;
 
   return (
     <>
@@ -1347,7 +1353,7 @@ export const LearnPage = () => {
                       <p className="mt-1 text-sm text-muted">
                         {completedIds.has(lesson?._id) 
                           ? "You have successfully finished this lesson. Keep up the great work!" 
-                          : `Requirement: Watch at least 50% of the video to unlock completion. Current: ${lessonProgress?.watchPercent || 0}%`}
+                          : "Mark this lesson as completed to track your progress."}
                       </p>
                     </div>
                     
@@ -1356,14 +1362,6 @@ export const LearnPage = () => {
                         <div className="flex items-center gap-2 rounded-full bg-green-500/10 px-4 py-2 text-xs font-black text-green-700 uppercase tracking-wider">
                           Completed
                         </div>
-                      ) : (lessonProgress?.watchPercent || 0) < 50 ? (
-                        <button 
-                          disabled 
-                          className="flex items-center gap-1.5 rounded-full bg-black/10 px-5 py-2.5 text-xs font-black text-muted transition cursor-not-allowed"
-                          title="Please watch at least 50% of the lesson video to mark as complete."
-                        >
-                          <Lock size={14} /> Locked (Watch 50%)
-                        </button>
                       ) : (
                         <button 
                           onClick={markComplete}
@@ -1380,13 +1378,11 @@ export const LearnPage = () => {
                     <div className="mt-4">
                       <div className="flex items-center justify-between text-xs font-bold text-muted mb-1.5">
                         <span>Video Watch Progress</span>
-                        <span>{lessonProgress?.watchPercent || 0}% / 50%</span>
+                        <span>{lessonProgress?.watchPercent || 0}%</span>
                       </div>
                       <div className="h-1.5 overflow-hidden rounded-full bg-black/5">
                         <div 
-                          className={`h-full rounded-full transition-all duration-500 ${
-                            (lessonProgress?.watchPercent || 0) >= 50 ? "bg-green-500" : "bg-amber-500"
-                          }`} 
+                          className="h-full rounded-full transition-all duration-500 bg-amber-500" 
                           style={{ width: `${Math.min(lessonProgress?.watchPercent || 0, 100)}%` }} 
                         />
                       </div>
@@ -1495,10 +1491,7 @@ export const LearnPage = () => {
             <ProgressBar percent={progress.summary?.percent || 0} label={`${progress.summary?.completedLessons || 0} of ${progress.summary?.totalLessons || course?.lessons?.length || 0} lessons completed`} />
             <div className="mt-5 grid min-w-0 gap-3">
               {course?.lessons?.map((item, idx) => {
-                const isLocked = idx > 0 && !["main_admin", "teacher"].includes(user?.role) && (() => {
-                  const prev = course?.lessons?.[idx - 1];
-                  return prev ? !completedIds.has(prev._id) : false;
-                })();
+                const isLocked = false;
                 return (
                   <LessonRow key={item._id || item.slug} lesson={item} active={item.slug === lessonSlug} completed={completedIds.has(item._id)} locked={isLocked} to={`/learn/${course.slug}/${item.slug}`} />
                 );
