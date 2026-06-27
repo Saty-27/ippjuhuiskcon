@@ -3,12 +3,25 @@
 @tailwind utilities;
 
 @layer base {
+  html, body {
+    max-width: 100%;
+  }
+
   html {
     scroll-behavior: smooth;
   }
 
   body {
     @apply bg-white font-sans text-ink antialiased;
+  }
+
+  iframe {
+    max-width: 100% !important;
+  }
+
+  .aspect-video iframe {
+    width: 100% !important;
+    height: 100% !important;
   }
 
   ::selection {
@@ -51,5 +64,21 @@
 
 .animate-jiggle {
   animation: jiggle 0.8s ease-in-out infinite;
+}
+
+/* Custom Scrollbars */
+.custom-scrollbar::-webkit-scrollbar {
+  width: 6px;
+  height: 6px;
+}
+.custom-scrollbar::-webkit-scrollbar-track {
+  background: transparent;
+}
+.custom-scrollbar::-webkit-scrollbar-thumb {
+  background: rgba(0, 0, 0, 0.15);
+  border-radius: 9999px;
+}
+.custom-scrollbar::-webkit-scrollbar-thumb:hover {
+  background: rgba(0, 0, 0, 0.3);
 }
 

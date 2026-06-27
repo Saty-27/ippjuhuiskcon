@@ -225,7 +225,7 @@ export const NotificationBell = () => {
       </button>
 
       {open && (
-        <div className="absolute right-0 mt-2 w-80 rounded-2xl bg-white p-4 shadow-xl border border-black/5 md:w-96">
+        <div className="fixed inset-x-4 top-16 md:absolute md:inset-x-auto md:right-0 md:top-auto mt-2 w-auto max-w-sm md:w-96 rounded-2xl bg-white p-4 shadow-xl border border-black/5">
           <div className="mb-3 flex items-center justify-between border-b border-black/5 pb-2.5">
             <h3 className="text-sm font-black text-ink">Notifications</h3>
             {unreadCount > 0 && (
@@ -364,6 +364,7 @@ export const Navbar = () => {
   const { user, logout } = useAuth();
   const [open, setOpen] = useState(false);
   const [settings, setSettings] = useState(null);
+  const [scrolled, setScrolled] = useState(false);
   const location = useLocation();
   const dashboard = user?.role === "main_admin" ? "/admin/dashboard" : user?.role === "teacher" ? "/teacher/dashboard" : "/student/dashboard";
 
@@ -375,6 +376,14 @@ export const Navbar = () => {
     setOpen(false);
     trackPage(location.pathname);
   }, [location.pathname]);
+
+  useEffect(() => {
+    const handleScroll = () => {
+      setScrolled(window.scrollY > 10);
+    };
+    window.addEventListener("scroll", handleScroll);
+    return () => window.removeEventListener("scroll", handleScroll);
+  }, []);
 
   const links = useMemo(
     () =>
@@ -417,8 +426,8 @@ export const Navbar = () => {
   }, [links]);
 
   return (
-    <header className="sticky top-0 z-50 border-b border-black/5 bg-white/95 backdrop-blur">
-      <div className="container-pad flex items-center justify-between py-3">
+    <header className={`sticky top-0 z-50 border-b transition-all duration-300 ${scrolled ? "border-black/10 bg-white/95 shadow-md shadow-black/5 backdrop-blur-md" : "border-b-transparent bg-white/90 backdrop-blur-sm"}`}>
+      <div className={`container-pad flex items-center justify-between transition-all duration-300 ${scrolled ? "py-2" : "py-4"}`}>
         <Link to="/" aria-label="ISKCON Juhu IPP"><BrandLogo logo={settings?.logo} /></Link>
         <nav className="hidden items-center gap-7 lg:flex">
           {processedLinks.map((link) =>
@@ -500,7 +509,7 @@ export const Footer = () => {
           <div className="mb-5"><BrandLogo logo={footer.logo} tone="dark" /></div>
           <p className="max-w-sm text-sm leading-7 text-white/70">{footer.description}</p>
           {footer.newsletterEnabled !== false && (
-            <form onSubmit={subscribe} className="mt-6 flex max-w-md gap-2 rounded-full bg-white p-1">
+            <form onSubmit={subscribe} className="mt-6 flex w-full max-w-md gap-2 rounded-full bg-white p-1">
               <input type="email" value={email} onChange={(event) => setEmail(event.target.value)} placeholder="Email address" className="min-w-0 flex-1 rounded-full px-4 text-sm text-ink outline-none" required />
               <button className="rounded-full bg-primary px-5 py-2 text-sm font-bold text-white">Subscribe</button>
             </form>
@@ -527,11 +536,13 @@ export const Footer = () => {
 };
 
 export const PublicLayout = () => (
-  <>
+  <div className="flex min-h-screen flex-col w-full">
     <Navbar />
-    <Outlet />
+    <main className="flex-grow">
+      <Outlet />
+    </main>
     <Footer />
-  </>
+  </div>
 );
 
 export const HeroSlider = ({ banners = [] }) => {
@@ -798,6 +809,8 @@ export const VideoPlayer = ({ url, youtubeUrl, uploadedVideo, title, startAt = 0
       if (!window.YT || !window.YT.Player) return false;
       
       ytPlayerRef.current = new window.YT.Player(containerId, {
+        width: "100%",
+        height: "100%",
         videoId: ytVideoId,
         playerVars: {
           start: Math.round(startAt),
@@ -901,8 +914,8 @@ export const VideoPlayer = ({ url, youtubeUrl, uploadedVideo, title, startAt = 0
   }
 
   return (
-    <div className="overflow-hidden rounded-2xl bg-black">
-      <div id={containerId} className="aspect-video w-full" />
+    <div className="overflow-hidden rounded-2xl bg-black aspect-video w-full">
+      <div id={containerId} className="h-full w-full" />
     </div>
   );
 };
@@ -991,7 +1004,7 @@ export const dashboardLinks = {
     { label: "Legal Pages", url: "/admin/legal-pages", icon: Shield },
     { label: "Site Settings", url: "/admin/site-settings", icon: Settings },
     { label: "Traffic", url: "/admin/traffic", icon: BarChart3 },
-    { label: "Reports", url: "/admin/reports", icon: BarChart3 }
+    { label: "Student Progress", url: "/admin/reports", icon: Users }
   ]
 };
 
@@ -1004,10 +1017,10 @@ export const DashboardLayout = ({ role }) => {
     navigate("/");
   };
   return (
-    <div className="min-h-screen bg-soft">
+    <div className="min-h-screen bg-soft w-full">
       <aside className="fixed inset-y-0 left-0 z-40 hidden w-72 border-r border-black/5 bg-white lg:block">
         <Link to="/" className="flex h-20 items-center border-b border-black/5 px-6" aria-label="ISKCON Juhu IPP"><BrandLogo compact /></Link>
-        <nav className="h-[calc(100vh-9rem)] overflow-y-auto px-4 py-5">
+        <nav className="h-[calc(100vh-9rem)] overflow-y-auto custom-scrollbar px-4 py-5">
           {links.map((item) => {
             const Icon = item.icon;
             return <NavLink key={item.url} to={item.url} className={({ isActive }) => `mb-1 flex items-center gap-3 rounded-xl px-4 py-3 text-sm font-bold transition ${isActive ? "bg-primary text-white shadow-lg shadow-primary/20" : "text-ink hover:bg-soft"}`}><Icon size={18} />{item.label}</NavLink>;
@@ -1017,8 +1030,13 @@ export const DashboardLayout = ({ role }) => {
       </aside>
       <main className="lg:pl-72">
         <header className="sticky top-0 z-30 flex h-16 items-center justify-between border-b border-black/5 bg-white px-4 lg:px-8">
-          <div><p className="text-xs font-bold uppercase text-primary">{role.replace("_", " ")}</p><h1 className="text-lg font-black text-ink">Welcome, {user?.name}</h1></div>
-          <div className="flex items-center gap-3">
+          <Link to="/" className="min-w-0 flex-1 mr-2 block hover:opacity-85 transition cursor-pointer" title="Go to homepage">
+            <p className="text-[10px] sm:text-xs font-bold uppercase text-primary">{role.replace("_", " ")}</p>
+            <h1 className="text-sm sm:text-lg font-black text-ink truncate max-w-[160px] sm:max-w-xs md:max-w-none">
+              Welcome, {user?.name}
+            </h1>
+          </Link>
+          <div className="flex items-center gap-2 sm:gap-3 shrink-0">
             <NotificationBell />
             <button onClick={handleLogout} className="rounded-full border border-black/10 px-4 py-2 text-sm font-bold lg:hidden">Logout</button>
           </div>

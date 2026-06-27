@@ -533,11 +533,15 @@ export const CourseDetailPage = () => {
 
   const handleUploadSubmit = async (e) => {
     e.preventDefault();
-    if (!uploadForm.documentUrl) {
+    const types = Array.isArray(course.enrollmentType) ? course.enrollmentType : [course.enrollmentType || "free"];
+    const requiresDoc = types.includes("verification");
+    const requiresPay = types.includes("paid");
+
+    if (requiresDoc && !uploadForm.documentUrl) {
       setUploadError("Please upload a document to proceed.");
       return;
     }
-    if (!uploadForm.paymentPhotoUrl) {
+    if (requiresPay && !uploadForm.paymentPhotoUrl) {
       setUploadError("Please upload a payment receipt / screenshot to proceed.");
       return;
     }
@@ -549,7 +553,7 @@ export const CourseDetailPage = () => {
           courseId: course._id
         }
       });
-      setMessage("Document and payment receipt submitted successfully. Admin review is pending.");
+      setMessage("Your submission has been received successfully. Admin review is pending.");
       setShowUploadModal(false);
       loadStatus();
     } catch (err) {
@@ -626,18 +630,18 @@ export const CourseDetailPage = () => {
     <>
       <SEO title={course.seoTitle || `${course.title} Course`} description={course.seoDescription || course.shortDescription || course.description} />
       <PageBanner title={course.title} subtitle={course.shortDescription} image={course.bannerImage || course.thumbnail} />
-      <section className="section-pad bg-soft"><div className="container-pad grid gap-8 lg:grid-cols-[1fr_360px]">
-        <div className="rounded-2xl bg-white p-6 shadow-sm">
+      <section className="section-pad bg-soft"><div className="container-pad grid gap-8 w-full min-w-0 lg:grid-cols-[1fr_360px]">
+        <div className="rounded-2xl bg-white p-6 shadow-sm w-full min-w-0">
           <div className="mb-6 flex flex-wrap gap-3 text-sm font-bold text-muted"><span>{course.duration || "Self paced"}</span><span>{course.level}</span><span>{displayLessons.length} lessons</span><span>{course.priceType === "Paid" ? `₹${course.price || 0}` : "Free"}</span></div>
           {progress && <ProgressBar percent={progress.percent} label={`${progress.completedLessons} of ${progress.totalLessons} lessons completed`} />}
           <div className="prose mt-8 max-w-none" dangerouslySetInnerHTML={{ __html: course.description }} />
           {course.whatYouWillLearn?.length > 0 && <><h2 className="mt-10 text-2xl font-black">What you will learn</h2><div className="mt-4 grid gap-3 sm:grid-cols-2">{course.whatYouWillLearn.map((item) => <div key={item} className="flex gap-2 rounded-xl bg-soft p-3 text-sm font-bold"><CheckCircle2 className="text-primary" size={18} />{item}</div>)}</div></>}
-          <div className="mt-10 grid gap-6 xl:grid-cols-[0.95fr_1.05fr]">
-            <div>
+          <div className="mt-10 grid gap-6 w-full min-w-0 xl:grid-cols-[0.95fr_1.05fr]">
+            <div className="w-full min-w-0">
               <h2 className="text-2xl font-black">Lessons & Chapters</h2>
-              <div className="mt-4 grid gap-3">
+              <div className="mt-4 grid gap-3 w-full min-w-0">
                 {displayLessons.map((lesson, index) => (
-                  <button key={lesson._id || lesson.slug} type="button" onClick={() => setActiveLesson(lesson)} className={`rounded-2xl border p-4 text-left transition ${activeLesson?._id === lesson._id ? "border-primary bg-primary/10" : "border-black/10 bg-soft hover:border-primary/40"}`}>
+                  <button key={lesson._id || lesson.slug} type="button" onClick={() => setActiveLesson(lesson)} className={`w-full min-w-0 rounded-2xl border p-4 text-left transition ${activeLesson?._id === lesson._id ? "border-primary bg-primary/10" : "border-black/10 bg-soft hover:border-primary/40"}`}>
                     <div className="flex items-start gap-3">
                       <span className="grid h-9 w-9 shrink-0 place-items-center rounded-full bg-white text-sm font-black text-primary">
                         {index + 1}
@@ -659,7 +663,7 @@ export const CourseDetailPage = () => {
                 ))}
               </div>
             </div>
-            <div className="rounded-2xl border border-black/10 bg-white p-4">
+            <div className="rounded-2xl border border-black/10 bg-white p-4 min-w-0">
               {activeLesson ? (
                 isLessonLocked ? (
                   <div className="flex flex-col items-center justify-center text-center p-8 min-h-[300px] bg-soft/20 backdrop-blur-sm rounded-xl border border-black/5">
@@ -668,48 +672,73 @@ export const CourseDetailPage = () => {
                     </div>
                     <h3 className="text-lg font-black text-ink">Lesson Locked</h3>
                     <p className="mt-2 text-sm text-muted max-w-sm leading-relaxed">
-                      {course.enrollmentType === "verification" ? (
-                        enrollStatus.request?.status === "pending" ? (
-                          "Your document verification is currently pending admin review. Lessons will be unlocked once approved."
-                        ) : enrollStatus.request?.status === "rejected" ? (
-                          `Your verification was rejected. Reason: ${enrollStatus.request.rejectionReason || "Please review submission guidelines and re-submit."}`
-                        ) : (
-                          "This lesson requires course enrollment. Please enroll and complete document verification to unlock."
-                        )
-                      ) : (
-                        "This lesson is locked. Please enroll in the course to unlock all lessons."
-                      )}
+                      {(() => {
+                        const types = Array.isArray(course.enrollmentType) ? course.enrollmentType : [course.enrollmentType || "free"];
+                        const hasVerification = types.includes("verification");
+                        const hasPaid = types.includes("paid");
+
+                        if (hasVerification || hasPaid) {
+                          if (enrollStatus.request?.status === "pending") {
+                            return "Your verification is currently pending admin review. Lessons will be unlocked once approved.";
+                          }
+                          if (enrollStatus.request?.status === "rejected") {
+                            return `Your verification was rejected. Reason: ${enrollStatus.request.rejectionReason || "Please review submission guidelines and re-submit."}`;
+                          }
+                          return "This lesson requires course enrollment. Please enroll and submit verification to unlock.";
+                        }
+                        return "This lesson is locked. Please enroll in the course to unlock all lessons.";
+                      })()}
                     </p>
-                    {!enrollStatus.request && course.enrollmentType === "verification" && (
-                      <button
-                        onClick={() => {
-                          if (!user) return navigate("/login");
-                          setShowUploadModal(true);
-                        }}
-                        className="mt-5 rounded-full bg-primary px-6 py-2.5 text-sm font-black text-white hover:opacity-90 transition"
-                      >
-                        Submit Document to Unlock
-                      </button>
-                    )}
-                    {enrollStatus.request?.status === "rejected" && course.enrollmentType === "verification" && (
-                      <button
-                        onClick={() => {
-                          if (!user) return navigate("/login");
-                          setShowUploadModal(true);
-                        }}
-                        className="mt-5 rounded-full bg-primary px-6 py-2.5 text-sm font-black text-white hover:opacity-90 transition"
-                      >
-                        Re-submit Document
-                      </button>
-                    )}
-                    {course.enrollmentType === "free" && (
-                      <button
-                        onClick={enrollFree}
-                        className="mt-5 rounded-full bg-primary px-6 py-2.5 text-sm font-black text-white hover:opacity-90 transition"
-                      >
-                        Enroll Now to Unlock
-                      </button>
-                    )}
+                    {(() => {
+                      const types = Array.isArray(course.enrollmentType) ? course.enrollmentType : [course.enrollmentType || "free"];
+                      const hasVerification = types.includes("verification");
+                      const hasPaid = types.includes("paid");
+
+                      if (hasVerification || hasPaid) {
+                        if (!enrollStatus.request) {
+                          let btnText = "Submit Document to Unlock";
+                          if (hasVerification && hasPaid) {
+                            btnText = "Submit Document & Payment to Unlock";
+                          } else if (hasPaid) {
+                            btnText = "Submit Payment to Unlock";
+                          }
+                          return (
+                            <button
+                              onClick={() => {
+                                if (!user) return navigate("/login");
+                                setShowUploadModal(true);
+                              }}
+                              className="mt-5 rounded-full bg-primary px-6 py-2.5 text-sm font-black text-white hover:opacity-90 transition"
+                            >
+                              {btnText}
+                            </button>
+                          );
+                        }
+                        if (enrollStatus.request?.status === "rejected") {
+                          return (
+                            <button
+                              onClick={() => {
+                                if (!user) return navigate("/login");
+                                setShowUploadModal(true);
+                              }}
+                              className="mt-5 rounded-full bg-primary px-6 py-2.5 text-sm font-black text-white hover:opacity-90 transition"
+                            >
+                              Re-submit Verification
+                            </button>
+                          );
+                        }
+                      } else {
+                        return (
+                          <button
+                            onClick={enrollFree}
+                            className="mt-5 rounded-full bg-primary px-6 py-2.5 text-sm font-black text-white hover:opacity-90 transition"
+                          >
+                            Enroll Now to Unlock
+                          </button>
+                        );
+                      }
+                      return null;
+                    })()}
                   </div>
                 ) : (
                   <>
@@ -726,7 +755,7 @@ export const CourseDetailPage = () => {
             </div>
           </div>
         </div>
-        <aside className="h-fit rounded-2xl bg-white p-6 shadow-sm border border-black/5">
+        <aside className="h-fit rounded-2xl bg-white p-6 shadow-sm border border-black/5 min-w-0">
           <img src={assetUrl(course.thumbnail || course.bannerImage)} alt={course.title} loading="lazy" className="mb-5 aspect-[4/3] w-full rounded-xl object-cover" />
           
           {isEnrolled ? (
@@ -741,63 +770,75 @@ export const CourseDetailPage = () => {
             </button>
           ) : (
             <>
-              {course.enrollmentType === "verification" ? (
-                enrollStatus.request?.status === "pending" ? (
-                  <div className="w-full rounded-2xl border border-amber-200 bg-amber-50/50 p-4 text-center">
-                    <Clock className="mx-auto text-amber-600 mb-2" size={24} />
-                    <span className="text-sm font-black text-amber-800">Verification Pending</span>
-                    <p className="mt-1 text-xs text-amber-700 leading-normal">
-                      We are validating your document. Access will open shortly.
-                    </p>
-                  </div>
-                ) : enrollStatus.request?.status === "rejected" ? (
-                  <div className="w-full grid gap-3">
-                    <div className="rounded-2xl border border-rose-200 bg-rose-50/50 p-4 text-center">
-                      <AlertTriangle className="mx-auto text-rose-600 mb-2" size={24} />
-                      <span className="text-sm font-black text-rose-800">Submission Rejected</span>
-                      <p className="mt-1 text-xs text-rose-700 leading-normal">
-                        Reason: {enrollStatus.request.rejectionReason}
-                      </p>
-                    </div>
+              {(() => {
+                const types = Array.isArray(course.enrollmentType) ? course.enrollmentType : [course.enrollmentType || "free"];
+                const hasVerification = types.includes("verification");
+                const hasPaid = types.includes("paid");
+
+                if (hasVerification || hasPaid) {
+                  if (enrollStatus.request?.status === "pending") {
+                    return (
+                      <div className="w-full rounded-2xl border border-amber-200 bg-amber-50/50 p-4 text-center">
+                        <Clock className="mx-auto text-amber-600 mb-2" size={24} />
+                        <span className="text-sm font-black text-amber-800">Verification Pending</span>
+                        <p className="mt-1 text-xs text-amber-700 leading-normal">
+                          We are validating your document/payment. Access will open shortly.
+                        </p>
+                      </div>
+                    );
+                  }
+                  if (enrollStatus.request?.status === "rejected") {
+                    return (
+                      <div className="w-full grid gap-3">
+                        <div className="rounded-2xl border border-rose-200 bg-rose-50/50 p-4 text-center">
+                          <AlertTriangle className="mx-auto text-rose-600 mb-2" size={24} />
+                          <span className="text-sm font-black text-rose-800">Submission Rejected</span>
+                          <p className="mt-1 text-xs text-rose-700 leading-normal">
+                            Reason: {enrollStatus.request.rejectionReason}
+                          </p>
+                        </div>
+                        <button
+                          onClick={() => {
+                            if (!user) return navigate("/login");
+                            setShowUploadModal(true);
+                          }}
+                          className="w-full rounded-full bg-primary hover:opacity-90 px-6 py-3 text-sm font-black text-white transition"
+                        >
+                          Re-submit Verification
+                        </button>
+                      </div>
+                    );
+                  }
+
+                  let btnText = "Submit Document to Enroll";
+                  if (hasVerification && hasPaid) {
+                    btnText = "Submit Document & Payment";
+                  } else if (hasPaid) {
+                    btnText = `Buy Course (₹${course.price || 0})`;
+                  }
+
+                  return (
                     <button
                       onClick={() => {
                         if (!user) return navigate("/login");
                         setShowUploadModal(true);
                       }}
-                      className="w-full rounded-full bg-primary hover:opacity-90 px-6 py-3 text-sm font-black text-white transition"
+                      className="w-full rounded-full bg-primary hover:opacity-90 px-6 py-3 text-sm font-black text-white transition flex items-center justify-center gap-2"
                     >
-                      Re-submit Document
+                      {btnText}
                     </button>
-                  </div>
-                ) : (
+                  );
+                }
+
+                return (
                   <button
-                    onClick={() => {
-                      if (!user) return navigate("/login");
-                      setShowUploadModal(true);
-                    }}
+                    onClick={enrollFree}
                     className="w-full rounded-full bg-primary hover:opacity-90 px-6 py-3 text-sm font-black text-white transition"
                   >
-                    Submit Document to Enroll
+                    Enroll Now
                   </button>
-                )
-              ) : course.enrollmentType === "paid" ? (
-                <button
-                  onClick={() => {
-                    if (!user) return navigate("/login");
-                    setShowPaymentModal(true);
-                  }}
-                  className="w-full rounded-full bg-primary hover:opacity-90 px-6 py-3 text-sm font-black text-white transition flex items-center justify-center gap-2"
-                >
-                  Buy Course (₹{course.price || 0})
-                </button>
-              ) : (
-                <button
-                  onClick={enrollFree}
-                  className="w-full rounded-full bg-primary hover:opacity-90 px-6 py-3 text-sm font-black text-white transition"
-                >
-                  Enroll Now
-                </button>
-              )}
+                );
+              })()}
             </>
           )}
 
@@ -871,88 +912,102 @@ export const CourseDetailPage = () => {
                 />
               </label>
 
-              <div className="grid gap-1 border-t border-black/5 pt-4 mt-2">
-                <span className="text-xs font-black uppercase text-muted mb-2">
-                  Upload Required Document: <strong className="text-primary">{course.requiredDocumentName || "ID Proof"}</strong>
-                </span>
-                
-                <div className="rounded-2xl border-2 border-dashed border-black/10 p-5 text-center bg-soft hover:bg-black/5 transition relative cursor-pointer">
-                  <input
-                    type="file"
-                    accept={(course.allowedFileTypes || []).join(",")}
-                    onChange={(e) => handleDocumentFile(e.target.files?.[0])}
-                    className="absolute inset-0 opacity-0 cursor-pointer"
-                  />
-                  <div className="text-xs text-muted">
-                    <p className="font-bold text-ink mb-1">Drag and drop or click to upload file</p>
-                    <p>Allowed formats: {(course.allowedFileTypes || [".pdf", ".jpg", ".png"]).join(", ")}</p>
-                    <p>Maximum size: {course.maxFileSize || 5}MB</p>
-                  </div>
-                </div>
+              {(() => {
+                const courseTypes = Array.isArray(course.enrollmentType) ? course.enrollmentType : [course.enrollmentType || "free"];
+                const requiresDoc = courseTypes.includes("verification");
+                const requiresPay = courseTypes.includes("paid");
 
-                {isUploading && (
-                  <span className="mt-2 text-xs text-primary font-bold animate-pulse">Uploading file to secure server...</span>
-                )}
+                return (
+                  <>
+                    {requiresDoc && (
+                      <div className="grid gap-1 border-t border-black/5 pt-4 mt-2">
+                        <span className="text-xs font-black uppercase text-muted mb-2">
+                          Upload Required Document: <strong className="text-primary">{course.requiredDocumentName || "ID Proof"}</strong>
+                        </span>
+                        
+                        <div className="rounded-2xl border-2 border-dashed border-black/10 p-5 text-center bg-soft hover:bg-black/5 transition relative cursor-pointer">
+                          <input
+                            type="file"
+                            accept={(course.allowedFileTypes || []).join(",")}
+                            onChange={(e) => handleDocumentFile(e.target.files?.[0])}
+                            className="absolute inset-0 opacity-0 cursor-pointer"
+                          />
+                          <div className="text-xs text-muted">
+                            <p className="font-bold text-ink mb-1">Drag and drop or click to upload file</p>
+                            <p>Allowed formats: {(course.allowedFileTypes || [".pdf", ".jpg", ".png"]).join(", ")}</p>
+                            <p>Maximum size: {course.maxFileSize || 5}MB</p>
+                          </div>
+                        </div>
 
-                {uploadForm.documentUrl && (
-                  <div className="mt-3 flex items-center justify-between rounded-xl bg-emerald-50 border border-emerald-100 p-3 text-emerald-800 text-xs font-bold">
-                    <span>✓ Document uploaded successfully</span>
-                    <a href={assetUrl(uploadForm.documentUrl)} target="_blank" rel="noreferrer" className="underline font-black">Preview</a>
-                  </div>
-                )}
-              </div>
+                        {isUploading && (
+                          <span className="mt-2 text-xs text-primary font-bold animate-pulse">Uploading file to secure server...</span>
+                        )}
 
-              <div className="grid gap-1 border-t border-black/5 pt-4 mt-2">
-                <span className="text-xs font-black uppercase text-muted mb-2">
-                  Upload Payment Photo: <strong className="text-primary">Receipt / Screenshot</strong>
-                </span>
-                
-                <div className="rounded-2xl border-2 border-dashed border-black/10 p-5 text-center bg-soft hover:bg-black/5 transition relative cursor-pointer">
-                  <input
-                    type="file"
-                    accept=".jpg,.jpeg,.png,.webp"
-                    onChange={(e) => handlePaymentFile(e.target.files?.[0])}
-                    className="absolute inset-0 opacity-0 cursor-pointer"
-                  />
-                  <div className="text-xs text-muted">
-                    <p className="font-bold text-ink mb-1">Drag and drop or click to upload file</p>
-                    <p>Allowed formats: .jpg, .jpeg, .png, .webp</p>
-                    <p>Maximum size: {course.maxFileSize || 5}MB</p>
-                  </div>
-                </div>
+                        {uploadForm.documentUrl && (
+                          <div className="mt-3 flex items-center justify-between rounded-xl bg-emerald-50 border border-emerald-100 p-3 text-emerald-800 text-xs font-bold">
+                            <span>✓ Document uploaded successfully</span>
+                            <a href={assetUrl(uploadForm.documentUrl)} target="_blank" rel="noreferrer" className="underline font-black">Preview</a>
+                          </div>
+                        )}
+                      </div>
+                    )}
 
-                {isUploadingPayment && (
-                  <span className="mt-2 text-xs text-primary font-bold animate-pulse">Uploading payment receipt...</span>
-                )}
+                    {requiresPay && (
+                      <div className="grid gap-1 border-t border-black/5 pt-4 mt-2">
+                        <span className="text-xs font-black uppercase text-muted mb-2">
+                          Upload Payment Photo: <strong className="text-primary">Receipt / Screenshot</strong>
+                        </span>
+                        
+                        <div className="rounded-2xl border-2 border-dashed border-black/10 p-5 text-center bg-soft hover:bg-black/5 transition relative cursor-pointer">
+                          <input
+                            type="file"
+                            accept=".jpg,.jpeg,.png,.webp"
+                            onChange={(e) => handlePaymentFile(e.target.files?.[0])}
+                            className="absolute inset-0 opacity-0 cursor-pointer"
+                          />
+                          <div className="text-xs text-muted">
+                            <p className="font-bold text-ink mb-1">Drag and drop or click to upload file</p>
+                            <p>Allowed formats: .jpg, .jpeg, .png, .webp</p>
+                            <p>Maximum size: {course.maxFileSize || 5}MB</p>
+                          </div>
+                        </div>
 
-                {uploadForm.paymentPhotoUrl && (
-                  <div className="mt-3 flex items-center justify-between rounded-xl bg-emerald-50 border border-emerald-100 p-3 text-emerald-800 text-xs font-bold">
-                    <span>✓ Payment photo uploaded successfully</span>
-                    <a href={assetUrl(uploadForm.paymentPhotoUrl)} target="_blank" rel="noreferrer" className="underline font-black">Preview</a>
-                  </div>
-                )}
-              </div>
+                        {isUploadingPayment && (
+                          <span className="mt-2 text-xs text-primary font-bold animate-pulse">Uploading payment receipt...</span>
+                        )}
 
-              {uploadError && (
-                <p className="text-xs font-bold text-rose-600">{uploadError}</p>
-              )}
+                        {uploadForm.paymentPhotoUrl && (
+                          <div className="mt-3 flex items-center justify-between rounded-xl bg-emerald-50 border border-emerald-100 p-3 text-emerald-800 text-xs font-bold">
+                            <span>✓ Payment photo uploaded successfully</span>
+                            <a href={assetUrl(uploadForm.paymentPhotoUrl)} target="_blank" rel="noreferrer" className="underline font-black">Preview</a>
+                          </div>
+                        )}
+                      </div>
+                    )}
 
-              <div className="mt-4 flex justify-end gap-2 border-t border-black/5 pt-4">
-                <button
-                  type="button"
-                  onClick={() => { setShowUploadModal(false); setUploadError(""); }}
-                  className="rounded-xl border border-black/10 px-5 py-2.5 text-sm font-black hover:bg-soft transition"
-                >
-                  Cancel
-                </button>
-                <button
-                  type="submit"
-                  disabled={isUploading || isUploadingPayment || !uploadForm.documentUrl || !uploadForm.paymentPhotoUrl}
-                  className="rounded-xl bg-primary disabled:opacity-50 px-5 py-2.5 text-sm font-black text-white hover:opacity-90 transition"
-                >
-                  Submit Request
-                </button>
-              </div>
+                    {uploadError && (
+                      <p className="text-xs font-bold text-rose-600">{uploadError}</p>
+                    )}
+
+                    <div className="mt-4 flex justify-end gap-2 border-t border-black/5 pt-4">
+                      <button
+                        type="button"
+                        onClick={() => { setShowUploadModal(false); setUploadError(""); }}
+                        className="rounded-xl border border-black/10 px-5 py-2.5 text-sm font-black hover:bg-soft transition"
+                      >
+                        Cancel
+                      </button>
+                      <button
+                        type="submit"
+                        disabled={isUploading || isUploadingPayment || (requiresDoc && !uploadForm.documentUrl) || (requiresPay && !uploadForm.paymentPhotoUrl)}
+                        className="rounded-xl bg-primary disabled:opacity-50 px-5 py-2.5 text-sm font-black text-white hover:opacity-90 transition"
+                      >
+                        Submit Details
+                      </button>
+                    </div>
+                  </>
+                );
+              })()}
             </form>
           </div>
         </div>
@@ -3985,6 +4040,49 @@ export const AdminUsersPage = () => {
   const [msgModalStudent, setMsgModalStudent] = useState(null);
   const [personalMsgText, setPersonalMsgText] = useState("");
 
+  const [learningModalUser, setLearningModalUser] = useState(null);
+  const [learningDetails, setLearningDetails] = useState(null);
+  const [loadingLearning, setLoadingLearning] = useState(false);
+  const [selectedCourseForMonitoring, setSelectedCourseForMonitoring] = useState(null);
+  const [monitoringDetails, setMonitoringDetails] = useState(null);
+  const [loadingMonitoring, setLoadingMonitoring] = useState(false);
+  const [activeMonitoringTab, setActiveMonitoringTab] = useState("progress");
+
+  const openLearningModal = async (userItem) => {
+    setLearningModalUser(userItem);
+    setLoadingLearning(true);
+    setLearningDetails(null);
+    setSelectedCourseForMonitoring(null);
+    setMonitoringDetails(null);
+    try {
+      const data = await apiFetch(`/admin/users/${userItem._id}`);
+      if (data.success) {
+        setLearningDetails(data.user);
+      }
+    } catch (err) {
+      console.error("Failed to load user learning details", err);
+    } finally {
+      setLoadingLearning(false);
+    }
+  };
+
+  const loadCourseMonitoring = async (courseItem) => {
+    setSelectedCourseForMonitoring(courseItem);
+    setLoadingMonitoring(true);
+    setMonitoringDetails(null);
+    setActiveMonitoringTab("progress");
+    try {
+      const data = await apiFetch(`/admin/student-progress/${learningModalUser._id}/${courseItem._id}/details`);
+      if (data.success) {
+        setMonitoringDetails(data);
+      }
+    } catch (err) {
+      console.error("Failed to load course details", err);
+    } finally {
+      setLoadingMonitoring(false);
+    }
+  };
+
   const load = () => apiFetch(`/admin/users?search=${encodeURIComponent(filters.search)}&status=${filters.status}`).then((data) => setItems(data.items || [])).catch((error) => setNotice(error.message));
   useEffect(() => { load(); }, []);
 
@@ -4106,7 +4204,19 @@ export const AdminUsersPage = () => {
                 <td className="px-4 py-3">
                   <span className={`rounded-full px-3 py-1 text-xs font-black ${item.status === "blocked" ? "bg-red-50 text-red-600" : item.status === "pending" ? "bg-yellow-50 text-yellow-700" : "bg-primary/10 text-primary"}`}>{item.status}</span>
                 </td>
-                <td className="px-4 py-3">{item.enrolledCourses || 0} courses · {item.lessonsCompleted || 0} lessons</td>
+                <td className="px-4 py-3">
+                  {item.enrolledCourses > 0 ? (
+                    <button
+                      onClick={() => openLearningModal(item)}
+                      className="text-primary hover:underline font-bold text-left flex items-center gap-1.5"
+                      title="Click to view detailed devotee progress"
+                    >
+                      <span>{item.enrolledCourses} courses · {item.lessonsCompleted || 0} lessons</span>
+                    </button>
+                  ) : (
+                    <span className="text-muted">{item.enrolledCourses || 0} courses · {item.lessonsCompleted || 0} lessons</span>
+                  )}
+                </td>
                 <td className="px-4 py-3">
                   <div className="flex gap-2">
                     <input value={tempPasswords[item._id] || ""} onChange={(e) => setTempPasswords({ ...tempPasswords, [item._id]: e.target.value })} placeholder="Temp password" className="w-36 rounded-lg border border-black/10 px-3 py-2" />
@@ -4270,6 +4380,204 @@ export const AdminUsersPage = () => {
                 Send Message
               </button>
             </div>
+          </div>
+        </div>
+      )}
+
+      {learningModalUser && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/60 p-4 backdrop-blur-sm animate-fade-in">
+          <div className="w-full max-w-3xl rounded-3xl bg-white p-6 shadow-2xl border border-black/10 max-h-[90vh] overflow-y-auto">
+            <div className="flex items-center justify-between border-b border-black/5 pb-4 mb-4">
+              <div>
+                <h2 className="text-xl font-black text-ink">Devotee Learning Profile</h2>
+                <p className="text-xs text-muted mt-0.5">
+                  Student: <strong className="text-ink">{learningModalUser.name} ({learningModalUser.email})</strong>
+                </p>
+              </div>
+              <button onClick={() => { setLearningModalUser(null); setLearningDetails(null); setSelectedCourseForMonitoring(null); setMonitoringDetails(null); }} className="rounded-full bg-soft p-2 hover:bg-black/10 text-muted">×</button>
+            </div>
+
+            {loadingLearning ? (
+              <div className="py-12 text-center text-sm font-semibold text-muted">Loading learning profile...</div>
+            ) : learningDetails ? (
+              <div className="grid gap-6">
+                {/* Enrolled Courses List */}
+                <div>
+                  <h3 className="text-sm font-black text-ink uppercase tracking-wider text-muted mb-3">Enrolled Courses</h3>
+                  {learningDetails.enrollments?.length > 0 ? (
+                    <div className="grid gap-3 sm:grid-cols-2">
+                      {learningDetails.enrollments.map((enr) => {
+                        const courseItem = enr.course || {};
+                        const isSelected = selectedCourseForMonitoring?._id === courseItem._id;
+                        
+                        // Calculate completion percent
+                        const progressList = learningDetails.progress?.filter((p) => p.course?._id === courseItem._id) || [];
+                        const completedList = progressList.filter((p) => p.isCompleted);
+                        const percent = progressList.length > 0 ? Math.round((completedList.length / Math.max(progressList.length, 1)) * 100) : 0;
+                        const watchSecs = progressList.reduce((sum, p) => sum + (p.watchSeconds || 0), 0);
+                        const mins = Math.round(watchSecs / 60);
+
+                        return (
+                          <div
+                            key={enr._id}
+                            onClick={() => loadCourseMonitoring(courseItem)}
+                            className={`rounded-2xl border p-4 cursor-pointer transition ${
+                              isSelected
+                                ? "border-primary bg-primary/5"
+                                : "border-black/5 bg-soft/20 hover:border-black/10"
+                            }`}
+                          >
+                            <h4 className="font-bold text-ink text-sm mb-1">{courseItem.title || "Unknown Course"}</h4>
+                            <div className="flex items-center gap-2 mb-2">
+                              <span className="text-[10px] bg-primary/10 text-primary font-black px-1.5 py-0.5 rounded">
+                                {percent}% Completed
+                              </span>
+                              <span className="text-[10px] text-muted font-bold">
+                                {mins} mins watched
+                              </span>
+                            </div>
+                            <div className="h-1.5 w-full bg-black/5 rounded-full overflow-hidden">
+                              <div style={{ width: `${percent}%` }} className="h-full bg-primary rounded-full" />
+                            </div>
+                            <span className="mt-3 block text-[10px] font-black text-primary text-right">
+                              {isSelected ? "Selected · View details below" : "Click to view detailed activity"} &rarr;
+                            </span>
+                          </div>
+                        );
+                      })}
+                    </div>
+                  ) : (
+                    <div className="rounded-xl border border-dashed border-black/10 py-6 text-center text-xs text-muted">
+                      This user is not enrolled in any courses yet.
+                    </div>
+                  )}
+                </div>
+
+                {/* Detailed Monitoring for selected course */}
+                {selectedCourseForMonitoring && (
+                  <div className="border-t border-black/5 pt-5 mt-2">
+                    <div className="mb-4">
+                      <h3 className="text-sm font-black text-ink uppercase tracking-wider text-muted">
+                        Course Detail: <span className="text-primary">{selectedCourseForMonitoring.title}</span>
+                      </h3>
+                    </div>
+
+                    {loadingMonitoring ? (
+                      <div className="py-6 text-center text-xs font-semibold text-muted">Loading activity logs...</div>
+                    ) : monitoringDetails ? (
+                      <div>
+                        {/* Tabs */}
+                        <div className="flex gap-4 border-b border-black/10 pb-px mb-5">
+                          <button
+                            onClick={() => setActiveMonitoringTab("progress")}
+                            className={`pb-3 text-xs font-black transition ${activeMonitoringTab === "progress" ? "border-b border-primary text-primary" : "text-muted hover:text-ink"}`}
+                          >
+                            Lesson Progress
+                          </button>
+                          <button
+                            onClick={() => setActiveMonitoringTab("notes")}
+                            className={`pb-3 text-xs font-black transition ${activeMonitoringTab === "notes" ? "border-b border-primary text-primary" : "text-muted hover:text-ink"}`}
+                          >
+                            Taken Notes ({monitoringDetails.notes?.length || 0})
+                          </button>
+                          <button
+                            onClick={() => setActiveMonitoringTab("comments")}
+                            className={`pb-3 text-xs font-black transition ${activeMonitoringTab === "comments" ? "border-b border-primary text-primary" : "text-muted hover:text-ink"}`}
+                          >
+                            Posted Comments ({monitoringDetails.comments?.length || 0})
+                          </button>
+                        </div>
+
+                        {/* Tab content */}
+                        {activeMonitoringTab === "progress" && (
+                          <div className="space-y-3">
+                            <div className="rounded-xl border border-black/10 overflow-x-auto custom-scrollbar text-xs">
+                              <table className="w-full text-left">
+                                <thead className="bg-soft border-b border-black/5 text-muted uppercase font-black">
+                                  <tr>
+                                    <th className="px-4 py-2.5">Lesson Title</th>
+                                    <th className="px-4 py-2.5">Completed</th>
+                                    <th className="px-4 py-2.5">Watch Time</th>
+                                    <th className="px-4 py-2.5">Last Watched</th>
+                                  </tr>
+                                </thead>
+                                <tbody className="divide-y divide-black/5 font-semibold text-ink">
+                                  {monitoringDetails.progress?.map((p) => (
+                                    <tr key={p._id} className="hover:bg-soft/20">
+                                      <td className="px-4 py-2.5 font-bold">{p.lesson?.title || "Unknown Lesson"}</td>
+                                      <td className="px-4 py-2.5">
+                                        {p.isCompleted ? (
+                                          <span className="text-green-600 font-bold">✓ Yes</span>
+                                        ) : (
+                                          <span className="text-amber-600 font-bold">In Progress</span>
+                                        )}
+                                      </td>
+                                      <td className="px-4 py-2.5">{Math.round((p.watchSeconds || 0) / 60)} min</td>
+                                      <td className="px-4 py-2.5 text-muted">{p.lastWatchedAt ? new Date(p.lastWatchedAt).toLocaleDateString() : "N/A"}</td>
+                                    </tr>
+                                  ))}
+                                  {(!monitoringDetails.progress || monitoringDetails.progress.length === 0) && (
+                                    <tr>
+                                      <td colSpan="4" className="px-4 py-6 text-center text-muted">No lesson progress logs recorded yet.</td>
+                                    </tr>
+                                  )}
+                                </tbody>
+                              </table>
+                            </div>
+                          </div>
+                        )}
+
+                        {activeMonitoringTab === "notes" && (
+                          <div className="space-y-3">
+                            {monitoringDetails.notes?.map((n) => (
+                              <div key={n._id} className="rounded-2xl border border-black/5 p-4 bg-soft/20 text-ink">
+                                <div className="flex justify-between items-center text-xs font-black text-muted mb-2">
+                                  <span>Lesson: <strong className="text-ink">{n.lesson?.title || "General"}</strong></span>
+                                  <span>Timestamp: {Math.floor((n.timestamp || 0) / 60)}m</span>
+                                </div>
+                                {n.title && <h4 className="font-bold text-ink mb-1 text-sm">{n.title}</h4>}
+                                <p className="text-xs text-ink leading-relaxed whitespace-pre-wrap">{n.content}</p>
+                                <span className="block mt-2 text-[10px] text-muted text-right font-semibold">Created: {new Date(n.createdAt).toLocaleString()}</span>
+                              </div>
+                            ))}
+                            {(!monitoringDetails.notes || monitoringDetails.notes.length === 0) && (
+                              <div className="py-12 text-center text-xs text-muted">No notes taken by this student in this course yet.</div>
+                            )}
+                          </div>
+                        )}
+
+                        {activeMonitoringTab === "comments" && (
+                          <div className="space-y-3 text-ink">
+                            {monitoringDetails.comments?.map((c) => (
+                              <div key={c._id} className="rounded-2xl border border-black/5 p-4 bg-soft/20 text-ink">
+                                <div className="text-xs font-black text-muted mb-2">
+                                  Lesson: <strong className="text-ink">{c.lesson?.title || "General"}</strong> · Status: <span className="text-primary font-black uppercase">{c.status}</span>
+                                </div>
+                                <p className="text-xs text-ink leading-relaxed whitespace-pre-wrap">{c.text}</p>
+                                {c.adminReply && (
+                                  <div className="mt-3 bg-white rounded-xl border border-black/5 p-3 text-xs text-ink">
+                                    <span className="font-bold text-primary block mb-1">Reply:</span>
+                                    <p className="text-muted leading-relaxed">{c.adminReply}</p>
+                                  </div>
+                                )}
+                                <span className="block mt-2 text-[10px] text-muted text-right font-semibold">Posted: {new Date(c.createdAt).toLocaleString()}</span>
+                              </div>
+                            ))}
+                            {(!monitoringDetails.comments || monitoringDetails.comments.length === 0) && (
+                              <div className="py-12 text-center text-xs text-muted">No comments posted by this student in this course yet.</div>
+                            )}
+                          </div>
+                        )}
+                      </div>
+                    ) : (
+                      <div className="py-6 text-center text-xs text-rose-500 font-semibold">Failed to load course monitoring data.</div>
+                    )}
+                  </div>
+                )}
+              </div>
+            ) : (
+              <div className="py-12 text-center text-sm font-semibold text-rose-500">Failed to load learning profile details.</div>
+            )}
           </div>
         </div>
       )}
@@ -4837,7 +5145,7 @@ export const AdminCoursesPage = () => {
     order: 0,
     showOnHomepage: true,
     featured: false,
-    enrollmentType: "free",
+    enrollmentType: ["free"],
     verificationInstructions: "",
     requiredDocumentName: "",
     allowedFileTypes: ".pdf, .jpg, .jpeg, .png",
@@ -4862,14 +5170,43 @@ export const AdminCoursesPage = () => {
     setForm(empty);
   };
 
+  const handleEnrollmentTypeChange = (type, checked) => {
+    let current = Array.isArray(form.enrollmentType)
+      ? form.enrollmentType
+      : [form.enrollmentType || "free"];
+    
+    if (checked) {
+      if (!current.includes(type)) {
+        current = [...current, type];
+      }
+    } else {
+      current = current.filter((t) => t !== type);
+    }
+    
+    if (current.length === 0) {
+      current = ["free"];
+    }
+
+    setForm({
+      ...form,
+      enrollmentType: current,
+      isFree: !current.includes("paid"),
+      price: current.includes("paid") ? form.price : 0
+    });
+  };
+
   const submit = async (event) => {
     event.preventDefault();
     try {
+      const enrollmentTypes = Array.isArray(form.enrollmentType)
+        ? form.enrollmentType
+        : [form.enrollmentType || "free"];
       const body = {
         ...form,
+        enrollmentType: enrollmentTypes,
         price: Number(form.price || 0),
         order: Number(form.order || 0),
-        isFree: Boolean(form.isFree),
+        isFree: !enrollmentTypes.includes("paid"),
         isActive: Boolean(form.isActive),
         showOnHomepage: Boolean(form.showOnHomepage),
         featured: Boolean(form.featured),
@@ -4889,11 +5226,15 @@ export const AdminCoursesPage = () => {
 
   const edit = (item) => {
     setEditing(item._id);
+    const itemEnrollmentTypes = Array.isArray(item.enrollmentType)
+      ? item.enrollmentType
+      : [item.enrollmentType || "free"];
     setForm({
       ...empty,
       ...item,
       allowedFileTypes: Array.isArray(item.allowedFileTypes) ? item.allowedFileTypes.join(", ") : (item.allowedFileTypes || ".pdf, .jpg, .jpeg, .png"),
-      isFree: item.isFree ?? item.priceType !== "Paid",
+      enrollmentType: itemEnrollmentTypes,
+      isFree: item.isFree ?? !itemEnrollmentTypes.includes("paid"),
       isActive: boolValue(item.isActive),
       showOnHomepage: Boolean(item.showOnHomepage),
       featured: Boolean(item.featured)
@@ -4925,28 +5266,51 @@ export const AdminCoursesPage = () => {
             <ReactQuill theme="snow" value={textValue(form.description)} onChange={(val) => setForm({ ...form, description: val })} placeholder="Full course description" className="bg-white" />
           </div>
           
-          <label className="grid gap-1 md:col-span-2">
-            <span className="text-xs font-black uppercase text-muted">Enrollment Type</span>
-            <select
-              value={form.enrollmentType || "free"}
-              onChange={(event) => {
-                const val = event.target.value;
-                setForm({
-                  ...form,
-                  enrollmentType: val,
-                  isFree: val !== "paid",
-                  price: val === "paid" ? form.price : 0
-                });
-              }}
-              className="rounded-xl border border-black/10 px-4 py-3"
-            >
-              <option value="free">Free Course (Anyone can enroll directly)</option>
-              <option value="verification">Document Verification Required (Requires doc approval to unlock/enroll)</option>
-              <option value="paid">Paid Course / Future Payment (Requires payment to enroll)</option>
-            </select>
-          </label>
+          <div className="grid gap-1 md:col-span-2">
+            <span className="text-xs font-black uppercase text-muted block mb-1">Enrollment Type(s)</span>
+            <div className="flex flex-wrap gap-5 mt-1 rounded-xl border border-black/10 px-4 py-3 bg-soft/10">
+              <label className="flex items-center gap-2 cursor-pointer font-bold text-sm text-ink">
+                <input
+                  type="checkbox"
+                  checked={(() => {
+                    const types = Array.isArray(form.enrollmentType) ? form.enrollmentType : [form.enrollmentType || "free"];
+                    return types.includes("free");
+                  })()}
+                  onChange={(e) => handleEnrollmentTypeChange("free", e.target.checked)}
+                  className="rounded border-black/15 text-primary focus:ring-primary w-4 h-4"
+                />
+                Free Course (Direct Enroll)
+              </label>
 
-          {form.enrollmentType === "verification" && (
+              <label className="flex items-center gap-2 cursor-pointer font-bold text-sm text-ink">
+                <input
+                  type="checkbox"
+                  checked={(() => {
+                    const types = Array.isArray(form.enrollmentType) ? form.enrollmentType : [form.enrollmentType || "free"];
+                    return types.includes("verification");
+                  })()}
+                  onChange={(e) => handleEnrollmentTypeChange("verification", e.target.checked)}
+                  className="rounded border-black/15 text-primary focus:ring-primary w-4 h-4"
+                />
+                Document Verification Required
+              </label>
+
+              <label className="flex items-center gap-2 cursor-pointer font-bold text-sm text-ink">
+                <input
+                  type="checkbox"
+                  checked={(() => {
+                    const types = Array.isArray(form.enrollmentType) ? form.enrollmentType : [form.enrollmentType || "free"];
+                    return types.includes("paid");
+                  })()}
+                  onChange={(e) => handleEnrollmentTypeChange("paid", e.target.checked)}
+                  className="rounded border-black/15 text-primary focus:ring-primary w-4 h-4"
+                />
+                Paid Course (Future Payment Ready)
+              </label>
+            </div>
+          </div>
+
+          {((Array.isArray(form.enrollmentType) ? form.enrollmentType : [form.enrollmentType || "free"]).includes("verification")) && (
             <div className="grid gap-4 md:grid-cols-2 md:col-span-2 border-t border-black/5 pt-4 mt-2">
               <h4 className="text-sm font-black text-ink md:col-span-2">Verification Configuration</h4>
               
@@ -5001,7 +5365,7 @@ export const AdminCoursesPage = () => {
           </div>
           <select value={form.level || "Beginner"} onChange={(event) => setForm({ ...form, level: event.target.value })} className="rounded-xl border border-black/10 px-4 py-3"><option>Beginner</option><option>Intermediate</option><option>Advanced</option></select>
           <input type="number" value={numberValue(form.order)} onChange={(event) => setForm({ ...form, order: event.target.value })} placeholder="Order number" className="rounded-xl border border-black/10 px-4 py-3" />
-          <input type="number" value={numberValue(form.price)} onChange={(event) => setForm({ ...form, price: event.target.value })} disabled={form.enrollmentType !== "paid"} placeholder="Price" className="rounded-xl border border-black/10 px-4 py-3 disabled:bg-soft" />
+          <input type="number" value={numberValue(form.price)} onChange={(event) => setForm({ ...form, price: event.target.value })} disabled={!((Array.isArray(form.enrollmentType) ? form.enrollmentType : [form.enrollmentType || "free"]).includes("paid"))} placeholder="Price" className="rounded-xl border border-black/10 px-4 py-3 disabled:bg-soft" />
           <div className="grid gap-3 rounded-xl border border-black/10 p-4 text-sm font-bold">
             <label className="flex items-center gap-3"><input type="checkbox" checked={boolValue(form.isActive)} onChange={(event) => setForm({ ...form, isActive: event.target.checked })} />Active</label>
             <label className="flex items-center gap-3"><input type="checkbox" checked={Boolean(form.showOnHomepage)} onChange={(event) => setForm({ ...form, showOnHomepage: event.target.checked })} />Show on homepage</label>
@@ -5018,15 +5382,18 @@ export const AdminCoursesPage = () => {
               <div className="flex flex-wrap gap-2 text-xs font-black">
                 <span className="rounded-full bg-soft px-3 py-1">Order {item.order || 0}</span>
                 <span className={`rounded-full px-3 py-1 ${item.isActive ? "bg-primary/10 text-primary" : "bg-black/5 text-muted"}`}>{item.isActive ? "Active" : "Inactive"}</span>
-                <span className={`rounded-full px-3 py-1 ${
-                  item.enrollmentType === "verification" ? "bg-amber-100 text-amber-800" :
-                  item.enrollmentType === "paid" ? "bg-blue-100 text-blue-800" :
-                  "bg-emerald-100 text-emerald-800"
-                }`}>
-                  {item.enrollmentType === "verification" ? "Verification Required" :
-                   item.enrollmentType === "paid" ? `Paid (₹${item.price || 0})` :
-                   "Free"}
-                </span>
+                {(() => {
+                  const types = Array.isArray(item.enrollmentType) ? item.enrollmentType : [item.enrollmentType || "free"];
+                  return types.map((t) => {
+                    if (t === "verification") {
+                      return <span key={t} className="rounded-full px-3 py-1 bg-amber-100 text-amber-800">Verification Required</span>;
+                    }
+                    if (t === "paid") {
+                      return <span key={t} className="rounded-full px-3 py-1 bg-blue-100 text-blue-800">Paid (₹{item.price || 0})</span>;
+                    }
+                    return <span key={t} className="rounded-full px-3 py-1 bg-emerald-100 text-emerald-800">Free</span>;
+                  });
+                })()}
               </div>
               <h3 className="mt-2 text-xl font-black">{item.title}</h3>
               <p className="mt-1 text-sm text-muted">{item.shortDescription || item.category}</p>
@@ -5429,6 +5796,11 @@ export const ReportsPage = () => {
   const [courses, setCourses] = useState([]);
   const [notice, setNotice] = useState("");
 
+  const [selectedStudentProgress, setSelectedStudentProgress] = useState(null);
+  const [monitoringDetails, setMonitoringDetails] = useState(null);
+  const [loadingDetails, setLoadingDetails] = useState(false);
+  const [activeDetailsTab, setActiveDetailsTab] = useState("progress"); // "progress", "notes", "comments"
+
   const loadData = async () => {
     try {
       const url = `/admin/student-progress?search=${encodeURIComponent(filters.search)}&courseId=${filters.courseId}&status=${filters.status}`;
@@ -5456,6 +5828,23 @@ export const ReportsPage = () => {
       return `${hours}h ${mins}m`;
     }
     return `${mins}m`;
+  };
+
+  const openMonitoringModal = async (record) => {
+    setSelectedStudentProgress(record);
+    setLoadingDetails(true);
+    setMonitoringDetails(null);
+    setActiveDetailsTab("progress");
+    try {
+      const data = await apiFetch(`/admin/student-progress/${record.student._id}/${record.course._id}/details`);
+      if (data.success) {
+        setMonitoringDetails(data);
+      }
+    } catch (err) {
+      console.error("Failed to load details:", err);
+    } finally {
+      setLoadingDetails(false);
+    }
   };
 
   return (
@@ -5526,6 +5915,7 @@ export const ReportsPage = () => {
                   <th className="px-6 py-4">Watch Duration</th>
                   <th className="px-6 py-4">Last Activity</th>
                   <th className="px-6 py-4">Status</th>
+                  <th className="px-6 py-4 text-right">Monitoring</th>
                 </tr>
               </thead>
               <tbody className="divide-y divide-black/5 text-sm font-medium">
@@ -5580,11 +5970,19 @@ export const ReportsPage = () => {
                         </span>
                       )}
                     </td>
+                    <td className="px-6 py-4 text-right">
+                      <button
+                        onClick={() => openMonitoringModal(item)}
+                        className="rounded-xl border border-black/10 hover:bg-soft px-3 py-1.5 text-xs font-black text-primary transition"
+                      >
+                        Monitor
+                      </button>
+                    </td>
                   </tr>
                 ))}
                 {items.length === 0 && (
                   <tr>
-                    <td colSpan="6" className="px-6 py-12 text-center text-muted">
+                    <td colSpan="7" className="px-6 py-12 text-center text-muted">
                       No student progress records found matching your active filters.
                     </td>
                   </tr>
@@ -5594,6 +5992,137 @@ export const ReportsPage = () => {
           </div>
         </div>
       </div>
+
+      {selectedStudentProgress && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/60 p-4 backdrop-blur-sm animate-fade-in">
+          <div className="w-full max-w-3xl rounded-3xl bg-white p-6 shadow-2xl border border-black/10 max-h-[90vh] overflow-y-auto">
+            <div className="flex items-center justify-between border-b border-black/5 pb-4 mb-4">
+              <div>
+                <h2 className="text-xl font-black text-ink">Student Monitoring Details</h2>
+                <p className="text-xs text-muted mt-0.5">
+                  Student: <strong className="text-ink">{selectedStudentProgress.student?.name}</strong> · Course: <strong className="text-ink">{selectedStudentProgress.course?.title}</strong>
+                </p>
+              </div>
+              <button onClick={() => setSelectedStudentProgress(null)} className="rounded-full bg-soft p-2 hover:bg-black/10 text-muted">×</button>
+            </div>
+
+            {loadingDetails ? (
+              <div className="py-12 text-center text-sm font-semibold text-muted">Loading monitoring records...</div>
+            ) : monitoringDetails ? (
+              <div>
+                {/* Tabs */}
+                <div className="flex gap-4 border-b border-black/10 pb-px mb-5">
+                  <button
+                    onClick={() => setActiveDetailsTab("progress")}
+                    className={`pb-3 text-sm font-black transition ${activeDetailsTab === "progress" ? "border-b-2 border-primary text-primary" : "text-muted hover:text-ink"}`}
+                  >
+                    Lesson Progress
+                  </button>
+                  <button
+                    onClick={() => setActiveDetailsTab("notes")}
+                    className={`pb-3 text-sm font-black transition ${activeDetailsTab === "notes" ? "border-b-2 border-primary text-primary" : "text-muted hover:text-ink"}`}
+                  >
+                    Taken Notes ({monitoringDetails.notes?.length || 0})
+                  </button>
+                  <button
+                    onClick={() => setActiveDetailsTab("comments")}
+                    className={`pb-3 text-sm font-black transition ${activeDetailsTab === "comments" ? "border-b-2 border-primary text-primary" : "text-muted hover:text-ink"}`}
+                  >
+                    Posted Comments ({monitoringDetails.comments?.length || 0})
+                  </button>
+                </div>
+
+                {/* Tab content */}
+                {activeDetailsTab === "progress" && (
+                  <div className="space-y-3">
+                    <div className="grid grid-cols-2 gap-4 bg-soft/50 rounded-2xl p-4 border border-black/5 mb-4 text-xs font-bold text-ink">
+                      <div>Total Watch Time: <span className="text-primary font-black">{formatDuration(selectedStudentProgress.totalWatchTime || 0)}</span></div>
+                      <div>Completed Lessons: <span className="text-primary font-black">{selectedStudentProgress.completedLessons || 0}</span></div>
+                    </div>
+                    <div className="rounded-xl border border-black/10 overflow-x-auto custom-scrollbar text-xs">
+                      <table className="w-full text-left">
+                        <thead className="bg-soft border-b border-black/5 text-muted uppercase font-black">
+                          <tr>
+                            <th className="px-4 py-2.5">Lesson Title</th>
+                            <th className="px-4 py-2.5">Completed</th>
+                            <th className="px-4 py-2.5">Watch Time</th>
+                            <th className="px-4 py-2.5">Last Watched</th>
+                          </tr>
+                        </thead>
+                        <tbody className="divide-y divide-black/5 font-semibold text-ink">
+                          {monitoringDetails.progress?.map((p) => (
+                            <tr key={p._id} className="hover:bg-soft/20">
+                              <td className="px-4 py-2.5 font-bold">{p.lesson?.title || "Unknown Lesson"}</td>
+                              <td className="px-4 py-2.5">
+                                {p.isCompleted ? (
+                                  <span className="text-green-600 font-bold">✓ Yes</span>
+                                ) : (
+                                  <span className="text-amber-600 font-bold">In Progress</span>
+                                )}
+                              </td>
+                              <td className="px-4 py-2.5">{Math.round((p.watchSeconds || 0) / 60)} min</td>
+                              <td className="px-4 py-2.5 text-muted">{p.lastWatchedAt ? new Date(p.lastWatchedAt).toLocaleDateString() : "N/A"}</td>
+                            </tr>
+                          ))}
+                          {(!monitoringDetails.progress || monitoringDetails.progress.length === 0) && (
+                            <tr>
+                              <td colSpan="4" className="px-4 py-6 text-center text-muted">No lesson progress logs recorded yet.</td>
+                            </tr>
+                          )}
+                        </tbody>
+                      </table>
+                    </div>
+                  </div>
+                )}
+
+                {activeDetailsTab === "notes" && (
+                  <div className="space-y-3">
+                    {monitoringDetails.notes?.map((n) => (
+                      <div key={n._id} className="rounded-2xl border border-black/5 p-4 bg-soft/20 text-ink">
+                        <div className="flex justify-between items-center text-xs font-black text-muted mb-2">
+                          <span>Lesson: <strong className="text-ink">{n.lesson?.title || "General"}</strong></span>
+                          <span>Timestamp: {formatDuration(n.timestamp || 0)}</span>
+                        </div>
+                        {n.title && <h4 className="font-bold text-ink mb-1 text-sm">{n.title}</h4>}
+                        <p className="text-xs text-ink leading-relaxed whitespace-pre-wrap">{n.content}</p>
+                        <span className="block mt-2 text-[10px] text-muted text-right font-semibold">Created: {new Date(n.createdAt).toLocaleString()}</span>
+                      </div>
+                    ))}
+                    {(!monitoringDetails.notes || monitoringDetails.notes.length === 0) && (
+                      <div className="py-12 text-center text-xs text-muted">No notes taken by this student in this course yet.</div>
+                    )}
+                  </div>
+                )}
+
+                {activeDetailsTab === "comments" && (
+                  <div className="space-y-3 text-ink">
+                    {monitoringDetails.comments?.map((c) => (
+                      <div key={c._id} className="rounded-2xl border border-black/5 p-4 bg-soft/20 text-ink">
+                        <div className="text-xs font-black text-muted mb-2">
+                          Lesson: <strong className="text-ink">{c.lesson?.title || "General"}</strong> · Status: <span className="text-primary font-black uppercase">{c.status}</span>
+                        </div>
+                        <p className="text-xs text-ink leading-relaxed whitespace-pre-wrap">{c.text}</p>
+                        {c.adminReply && (
+                          <div className="mt-3 bg-white rounded-xl border border-black/5 p-3 text-xs text-ink">
+                            <span className="font-bold text-primary block mb-1">Reply:</span>
+                            <p className="text-muted leading-relaxed">{c.adminReply}</p>
+                          </div>
+                        )}
+                        <span className="block mt-2 text-[10px] text-muted text-right font-semibold">Posted: {new Date(c.createdAt).toLocaleString()}</span>
+                      </div>
+                    ))}
+                    {(!monitoringDetails.comments || monitoringDetails.comments.length === 0) && (
+                      <div className="py-12 text-center text-xs text-muted">No comments posted by this student in this course yet.</div>
+                    )}
+                  </div>
+                )}
+              </div>
+            ) : (
+              <div className="py-12 text-center text-sm font-semibold text-rose-500">Failed to load monitoring details.</div>
+            )}
+          </div>
+        </div>
+      )}
     </div>
   );
 };

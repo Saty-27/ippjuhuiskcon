@@ -842,26 +842,41 @@ app.get("/api/lessons/:id", optionalUser, asyncHandler(async (req, res) => {
   const lesson = await Lesson.findOne(filter).populate("course", "title slug enrollmentType teacher").lean();
   if (!lesson) return res.status(404).json({ success: false, message: "Lesson not found" });
 
-  if (lesson.course && ["verification", "paid"].includes(lesson.course.enrollmentType) && !lesson.isPreview) {
-    let hasAccess = false;
-    if (req.user) {
-      if (["main_admin"].includes(req.user.role)) {
-        hasAccess = true;
-      } else if (req.user.role === "teacher" && lesson.course.teacher?.toString() === req.user._id.toString()) {
-        hasAccess = true;
-      } else {
-        const enrolled = await learnerEnrollment(req.user._id, lesson.course._id);
-        if (enrolled) hasAccess = true;
+  if (lesson.course && !lesson.isPreview) {
+    const courseTypes = Array.isArray(lesson.course.enrollmentType)
+      ? lesson.course.enrollmentType
+      : [lesson.course.enrollmentType || "free"];
+    const requiresVerificationOrPaid = courseTypes.some(t => ["verification", "paid"].includes(t));
+    if (requiresVerificationOrPaid) {
+      let hasAccess = false;
+      if (req.user) {
+        if (["main_admin"].includes(req.user.role)) {
+          hasAccess = true;
+        } else if (req.user.role === "teacher" && lesson.course.teacher?.toString() === req.user._id.toString()) {
+          hasAccess = true;
+        } else {
+          const enrolled = await learnerEnrollment(req.user._id, lesson.course._id);
+          if (enrolled) {
+            const needsVerification = courseTypes.includes("verification");
+            const needsPaid = courseTypes.includes("paid");
+            if (needsVerification || needsPaid) {
+              const request = await CourseEnrollmentRequest.findOne({ student: req.user._id, course: lesson.course._id, status: "approved" });
+              if (request) hasAccess = true;
+            } else {
+              hasAccess = true;
+            }
+          }
+        }
       }
-    }
-    if (!hasAccess) {
-      return res.status(403).json({
-        success: false,
-        message: "You need admin verification before accessing this lesson.",
-        requiresVerification: true,
-        courseId: lesson.course._id,
-        courseSlug: lesson.course.slug
-      });
+      if (!hasAccess) {
+        return res.status(403).json({
+          success: false,
+          message: "You need admin verification before accessing this lesson.",
+          requiresVerification: true,
+          courseId: lesson.course._id,
+          courseSlug: lesson.course.slug
+        });
+      }
     }
   }
 
@@ -880,9 +895,29 @@ app.get(
     const course = await Course.findById(req.params.id);
     if (!course) return res.status(404).json({ success: false, message: "Course not found" });
 
+    const types = Array.isArray(course.enrollmentType)
+      ? course.enrollmentType
+      : [course.enrollmentType || "free"];
+
     const enrollment = await Enrollment.findOne({ student: req.user._id, course: course._id });
     if (enrollment) {
-      return res.json({ success: true, enrolled: true, status: enrollment.status, enrollmentType: course.enrollmentType || "free" });
+      if (types.includes("verification") || types.includes("paid")) {
+        const request = await CourseEnrollmentRequest.findOne({ student: req.user._id, course: course._id, status: "approved" });
+        if (!request) {
+          const pendingRequest = await CourseEnrollmentRequest.findOne({ student: req.user._id, course: course._id }).sort({ submittedAt: -1 }).lean();
+          return res.json({
+            success: true,
+            enrolled: false,
+            request: pendingRequest || null,
+            enrollmentType: types,
+            verificationInstructions: course.verificationInstructions || "",
+            requiredDocumentName: course.requiredDocumentName || "Document",
+            allowedFileTypes: course.allowedFileTypes || ["pdf", "jpg", "jpeg", "png"],
+            maxFileSize: course.maxFileSize || 5
+          });
+        }
+      }
+      return res.json({ success: true, enrolled: true, status: enrollment.status, enrollmentType: types });
     }
 
     const request = await CourseEnrollmentRequest.findOne({ student: req.user._id, course: course._id }).sort({ submittedAt: -1 }).lean();
@@ -890,7 +925,7 @@ app.get(
       success: true,
       enrolled: false,
       request: request || null,
-      enrollmentType: course.enrollmentType || "free",
+      enrollmentType: types,
       verificationInstructions: course.verificationInstructions || "",
       requiredDocumentName: course.requiredDocumentName || "Document",
       allowedFileTypes: course.allowedFileTypes || ["pdf", "jpg", "jpeg", "png"],
@@ -907,13 +942,15 @@ app.post(
     const course = await Course.findById(req.params.courseId);
     if (!course || course.isActive === false || course.status === "draft") return res.status(404).json({ success: false, message: "Course not found" });
     
-    const enrollmentType = course.enrollmentType || "free";
+    const types = Array.isArray(course.enrollmentType)
+      ? course.enrollmentType
+      : [course.enrollmentType || "free"];
     
-    if (enrollmentType === "paid") {
+    if (types.includes("paid") && !types.includes("free")) {
       return res.status(400).json({ success: false, message: "This course requires payment. Payment integration is coming soon." });
     }
     
-    if (enrollmentType === "verification") {
+    if (types.includes("verification") && !types.includes("free")) {
       const request = await CourseEnrollmentRequest.findOne({ student: req.user._id, course: course._id, status: "approved" });
       if (!request) {
         return res.status(400).json({ success: false, message: "Enrollment requires admin verification approval." });
@@ -934,11 +971,24 @@ app.post(
   protect,
   asyncHandler(async (req, res) => {
     const { courseId, fullName, email, phone, message, documentUrl, documentType, paymentPhotoUrl } = req.body;
-    if (!courseId || !fullName || !email || !phone || !documentUrl || !paymentPhotoUrl) {
-      return res.status(400).json({ success: false, message: "All required fields (including document and payment receipt) must be provided." });
+    if (!courseId || !fullName || !email || !phone) {
+      return res.status(400).json({ success: false, message: "Full Name, Email and Phone are required." });
     }
     const course = await Course.findById(courseId);
     if (!course) return res.status(404).json({ success: false, message: "Course not found" });
+    
+    const types = Array.isArray(course.enrollmentType)
+      ? course.enrollmentType
+      : [course.enrollmentType || "free"];
+    const requiresDoc = types.includes("verification");
+    const requiresPay = types.includes("paid");
+
+    if (requiresDoc && !documentUrl) {
+      return res.status(400).json({ success: false, message: "Document upload is required for this course." });
+    }
+    if (requiresPay && !paymentPhotoUrl) {
+      return res.status(400).json({ success: false, message: "Payment photo receipt is required for this course." });
+    }
     
     const existing = await CourseEnrollmentRequest.findOne({ student: req.user._id, course: courseId, status: "pending" });
     if (existing) {
@@ -952,9 +1002,9 @@ app.post(
       email,
       phone,
       message,
-      documentUrl,
+      documentUrl: requiresDoc ? documentUrl : undefined,
       documentType,
-      paymentPhotoUrl,
+      paymentPhotoUrl: requiresPay ? paymentPhotoUrl : undefined,
       status: "pending"
     });
     
@@ -1247,6 +1297,23 @@ app.get(
       success: true,
       items: filteredRecords
     });
+  })
+);
+
+app.get(
+  "/api/admin/student-progress/:studentId/:courseId/details",
+  protect,
+  asyncHandler(async (req, res) => {
+    if (req.user.role !== "main_admin" && req.user.role !== "teacher" && !req.user.permissions?.canViewAnalytics) {
+      return res.status(403).json({ success: false, message: "Unauthorized access" });
+    }
+    const { studentId, courseId } = req.params;
+    const [notes, comments, progressRecords] = await Promise.all([
+      Note.find({ user: studentId, course: courseId }).populate("lesson", "title").sort({ createdAt: -1 }).lean(),
+      Comment.find({ user: studentId, course: courseId }).populate("lesson", "title").sort({ createdAt: -1 }).lean(),
+      Progress.find({ student: studentId, course: courseId }).populate("lesson", "title").sort({ createdAt: 1 }).lean()
+    ]);
+    res.json({ success: true, notes, comments, progress: progressRecords });
   })
 );
 app.post(
@@ -2028,7 +2095,51 @@ app.post("/api/chats/send-message", protect, asyncHandler(async (req, res) => {
     console.error("Error creating chat notification:", err);
   }
 
-  res.status(201).json({ success: true, item: populatedMessage, room: updatedRoom });
+  let updatedRoomFinal = updatedRoom;
+  if ((!room.assignedToType || room.assignedToType === "bot") && req.user.role === "student") {
+    let replyText = "";
+    const lowText = (text || "").toLowerCase();
+    if (lowText.includes("doubt") || lowText.includes("lesson") || lowText.includes("yoga") || lowText.includes("gita")) {
+      replyText = "Hare Krishna! If you have a lesson-specific query, please use the lesson comment box or choose the 'Chat with Preacher' option to get personalized support!";
+    } else if (lowText.includes("access") || lowText.includes("lock") || lowText.includes("document") || lowText.includes("approve")) {
+      replyText = "Hare Krishna! For approvals, upload your required devotee recommendation letter. If you have questions, please choose the 'Admin Support' option to connect with our support desk.";
+    } else if (lowText.includes("complete") || lowText.includes("finish") || lowText.includes("certificate")) {
+      replyText = "To finish your course, watch all lesson videos to the end, mark them complete, and submit all quiz assessments!";
+    } else {
+      replyText = "Hare Krishna! I am your course chatbot. If my options can't help, click the options below to chat directly with either Course Preacher or Admin Support!";
+    }
+
+    const botMsg = await ChatMessage.create({
+      room: room._id,
+      course: courseId || room.course,
+      sender: req.user._id,
+      text: replyText,
+      messageType: "bot",
+      senderRole: "bot",
+      isBotMessage: true
+    });
+
+    const updatedSummary = (room.botSummary || "") + `\nStudent: ${text}\nBot: ${replyText}`;
+    updatedRoomFinal = await ChatRoom.findByIdAndUpdate(
+      room._id,
+      {
+        $set: { lastMessage: replyText, botSummary: updatedSummary, lastReplyBy: "bot", assignedToType: "bot" },
+        $currentDate: { lastMessageAt: true }
+      },
+      { new: true }
+    );
+
+    const populatedBotMessage = await ChatMessage.findById(botMsg._id)
+      .populate("sender", "name role profileImage")
+      .lean();
+
+    emitToUser(req.user._id, "receive_message", {
+      message: populatedBotMessage,
+      room: updatedRoomFinal
+    });
+  }
+
+  res.status(201).json({ success: true, item: populatedMessage, room: updatedRoomFinal });
 }));
 
 // Start/send a direct personal message from admin or teacher to a student
