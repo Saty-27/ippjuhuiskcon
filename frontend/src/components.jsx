@@ -757,9 +757,10 @@ const getYoutubeId = (url) => {
   return match ? match[1] : "";
 };
 
-export const VideoPlayer = ({ url, youtubeUrl, uploadedVideo, title, startAt = 0, onProgress, onDuration, videoRef: externalVideoRef }) => {
+export const VideoPlayer = ({ url, youtubeUrl, uploadedVideo, videoType, title, startAt = 0, onProgress, onDuration, videoRef: externalVideoRef }) => {
+  const isLocal = videoType === "upload" || (videoType !== "youtube" && (/\.(mp4|webm|mov)$/i.test(uploadedVideo || url || youtubeUrl || "") || (uploadedVideo && !uploadedVideo.includes("youtube.com") && !uploadedVideo.includes("youtu.be"))));
   const raw = uploadedVideo || youtubeUrl || url || "";
-  const src = uploadedVideo ? assetUrl(uploadedVideo) : youtubeEmbed(raw);
+  const src = isLocal ? assetUrl(uploadedVideo || url || youtubeUrl) : youtubeEmbed(raw);
   const internalVideoRef = useRef(null);
   const videoRef = externalVideoRef || internalVideoRef;
   const startApplied = useRef(false);

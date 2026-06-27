@@ -742,7 +742,7 @@ export const CourseDetailPage = () => {
                   </div>
                 ) : (
                   <>
-                    <VideoPlayer url={activeLesson.videoUrl} youtubeUrl={activeLesson.youtubeUrl} uploadedVideo={activeLesson.uploadedVideo} title={activeLesson.title} />
+                    <VideoPlayer url={activeLesson.videoUrl} youtubeUrl={activeLesson.youtubeUrl} uploadedVideo={activeLesson.uploadedVideo} videoType={activeLesson.videoType} title={activeLesson.title} />
                     <h3 className="mt-4 text-xl font-black">{activeLesson.title}</h3>
                     <p className="mt-2 text-sm leading-6 text-muted">{activeLesson.description}</p>
                     <div className="mt-4 flex flex-wrap gap-3">
@@ -1287,7 +1287,7 @@ export const LearnPage = () => {
               </div>
             ) : (
               <>
-                <VideoPlayer videoRef={videoRef} url={lesson?.videoUrl} youtubeUrl={lesson?.youtubeUrl} uploadedVideo={lesson?.uploadedVideo} title={lesson?.title} startAt={lessonProgress?.lastPosition || 0} onProgress={saveVideoProgress} />
+                <VideoPlayer videoRef={videoRef} url={lesson?.videoUrl} youtubeUrl={lesson?.youtubeUrl} uploadedVideo={lesson?.uploadedVideo} videoType={lesson?.videoType} title={lesson?.title} startAt={lessonProgress?.lastPosition || 0} onProgress={saveVideoProgress} />
                 
                 {showResumeBanner && resumeTime > 0 && (
                   <div className="mt-3 flex flex-wrap items-center justify-between gap-2 rounded-xl bg-primary/10 border border-primary/20 p-3 text-sm text-primary">
