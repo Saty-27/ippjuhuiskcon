@@ -5022,12 +5022,16 @@ const fieldLabel = (field) => field.replace(/([A-Z])/g, " $1").replace(/^./, (s)
 
 const FileField = ({ label, value, folder, accept, onChange }) => {
   const [uploading, setUploading] = useState(false);
+  const [error, setError] = useState("");
   const upload = async (file) => {
     if (!file) return;
     setUploading(true);
+    setError("");
     try {
       const uploaded = await uploadFile(file, folder);
       onChange(uploaded.url);
+    } catch (err) {
+      setError(err.message || "Upload failed");
     } finally {
       setUploading(false);
     }
@@ -5038,6 +5042,7 @@ const FileField = ({ label, value, folder, accept, onChange }) => {
       <input type="file" accept={accept} onChange={(event) => upload(event.target.files?.[0])} className="text-sm font-normal" />
       <input value={value || ""} onChange={(event) => onChange(event.target.value)} placeholder="Uploaded URL" className="rounded-lg border border-black/10 px-3 py-2 text-sm font-normal" />
       {uploading && <span className="text-xs text-primary">Uploading...</span>}
+      {error && <span className="text-xs text-rose-600">{error}</span>}
       {value && <a href={assetUrl(value)} target="_blank" rel="noreferrer" className="text-xs font-black text-primary">Preview uploaded file</a>}
     </label>
   );
