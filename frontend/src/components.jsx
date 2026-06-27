@@ -765,7 +765,6 @@ export const VideoPlayer = ({ url, youtubeUrl, uploadedVideo, videoType, title, 
   const videoRef = externalVideoRef || internalVideoRef;
   const startApplied = useRef(false);
 
-  const isLocal = /\.(mp4|webm|mov)$/i.test(src);
   const ytVideoId = useMemo(() => isLocal ? "" : getYoutubeId(raw), [raw, isLocal]);
   const containerId = useMemo(() => `yt-player-${Math.random().toString(36).substr(2, 9)}`, [ytVideoId]);
 
